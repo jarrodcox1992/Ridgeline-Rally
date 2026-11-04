@@ -25,6 +25,8 @@ The image shows a Lamborghini-style car, so keep that in mind before sharing or 
 
 Sunset: "Belfast Sunset (Pure Sky)" HDRI from [Poly Haven](https://polyhaven.com/a/belfast_sunset_puresky), CC0 (public domain).
 
+Night: "Qwantani Night (Pure Sky)" HDRI by Greg Zaal from [Poly Haven](https://polyhaven.com/a/qwantani_night_puresky), CC0 (public domain).
+
 ## Ground and road textures
 
 All from [Poly Haven](https://polyhaven.com/textures), CC0 (public domain):

@@ -70,6 +70,10 @@ const TIMES_OF_DAY := [
 		"sun_color": Color(1.0, 0.55, 0.28), "sun_energy": 2.2, "sky_energy": 1.0, "exposure": 0.72,
 		"fog_color": Color(0.5, 0.42, 0.4), "fog_density": 0.0005, "contrast": 1.18, "saturation": 1.2,
 		"shadow_scale": 0.55}, # a low sun's long shadows are expensive, so draw them over a shorter range
+	{"name": "Night", "sky": "res://textures/sky/qwantani_night_puresky_2k.hdr", "sun": Vector3(-0.3, 0.7, 0.4),
+		"sun_color": Color(0.35, 0.45, 0.75), "sun_energy": 0.15, "sky_energy": 0.7, "exposure": 0.95,
+		"fog_color": Color(0.04, 0.06, 0.12), "fog_density": 0.0018, "contrast": 1.15, "saturation": 1.1,
+		"shadow_scale": 0.4},
 ]
 const TERRAIN_TEXTURES := {
 	"grass_albedo": "res://textures/aerial_grass_rock/aerial_grass_rock_diff_2k.jpg",
@@ -298,6 +302,7 @@ var last_label: Label
 var best_label: Label
 var message_label: Label
 var message_timer := 0.0
+var current_time_of_day_index := 1
 
 
 func _ready() -> void:
@@ -379,6 +384,7 @@ func _process(delta: float) -> void:
 
 ## Index into TIMES_OF_DAY. Sunlight comes from where the sun is in the sky, so shadows match it.
 func set_time_of_day(index: int) -> void:
+	current_time_of_day_index = index
 	var time: Dictionary = TIMES_OF_DAY[index]
 	sky_material.panorama = load(time.sky)
 	sky_material.energy_multiplier = time.sky_energy
@@ -394,6 +400,10 @@ func set_time_of_day(index: int) -> void:
 	sun.look_at_from_position(Vector3.ZERO, -sun_direction, Vector3.UP)
 	_shadow_scale = time.shadow_scale
 	sun.directional_shadow_max_distance = _shadow_distance * _shadow_scale
+	var is_night: bool = time.name == "Night"
+	for c in cars:
+		if c.has_method("set_headlights"):
+			c.set_headlights(is_night)
 
 
 func _update_tree_shadows() -> void:
@@ -1064,6 +1074,8 @@ func _spawn_car() -> void:
 			racer.name = "AI " + opponent.name
 			racer.paint_color = opponent.color
 		add_child(racer)
+		if TIMES_OF_DAY[current_time_of_day_index].name == "Night":
+			racer.set_headlights(true)
 		if not is_player:
 			var driver := AIDriverScript.new()
 			racer.add_child(driver)

@@ -674,10 +674,11 @@ func _build_headlights() -> void:
 		# Spotlights shine down their -Z, so turn them to face forward and dip them slightly.
 		light.basis = Basis(Vector3.UP, PI) * Basis(Vector3.RIGHT, -0.07)
 		light.light_color = Color(1.0, 0.96, 0.88)
-		light.light_energy = 8.0
-		light.spot_range = 70.0
-		light.spot_angle = 24.0
-		light.spot_attenuation = 0.8
+		light.light_energy = 8.5
+		light.spot_range = 80.0
+		light.spot_angle = 26.0
+		light.spot_attenuation = 0.75
+		light.shadow_enabled = is_player
 		add_child(light)
 		_headlights.append(light)
 	set_headlights(false)

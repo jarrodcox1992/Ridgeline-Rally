@@ -10,7 +10,7 @@ Ordered by how much each one adds to realism or fun, given what a 2019 MacBook P
 | 4 | Grass clumps and rocks along the roadside | Close-up detail sells speed and realism | Done |
 | 5 | Road details: dashed center line, red-and-white curbs, guardrails | Makes it read as a real road and race circuit | Done |
 | 6 | Skid marks and tire smoke | Feedback when braking hard and drifting | Done |
-| 7 | Animated steering wheel and working headlight beams | Makes the cockpit view feel alive | Done (headlights matter most at night; a night mode would be a good follow-up) |
+| 7 | Animated steering wheel, working headlight beams, and Night Mode | Makes driving at night and the cockpit view feel alive | Done (Night mode with starry sky, shadow-casting headlights, and illuminated track) |
 | 8 | Better engine sound | The synthesized buzz is the weakest part of the game | Done |
 | 9 | Pause menu with graphics quality settings | Lets the game run well on slower and faster machines | Done (Medium is the default: 60 fps on this Mac; High is about 43) |
 | 10 | AI opponent cars | Something to race against | Done: 3 opponents, 3-lap race with countdown, positions and results |
