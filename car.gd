@@ -169,6 +169,17 @@ var _all_wheels: Array[VehicleWheel3D] = []
 var headlights_on := false
 ## Handbrake plus throttle at a standstill: front wheels locked, rears spinning in smoke.
 var burnout := false
+signal collision_impact(strength: float)
+
+var on_curb := false
+var _turbo_boost := 0.0
+var _turbo_phase := 0.0
+var _bov_level := 0.0
+var _bov_flutter := 0.0
+var _prev_throttle := 0.0
+var _rumble_phase := 0.0
+var _scrape_level := 0.0
+var _spark_emitter: GPUParticles3D
 
 var _brake_light_material: StandardMaterial3D
 var _tail_glow: OmniLight3D
@@ -197,6 +208,9 @@ func _ready() -> void:
 	# Godot's default damping acts like heavy air drag; real drag is modelled below instead.
 	linear_damp_mode = RigidBody3D.DAMP_MODE_REPLACE
 	linear_damp = 0.0
+	contact_monitor = true
+	max_contacts_reported = 4
+	body_entered.connect(_on_body_entered)
 	_layout = BODIES[body_style]
 	for box: Array in _layout.collision:
 		_add_collision(box[0], box[1])
@@ -232,6 +246,7 @@ func _ready() -> void:
 		add_child(exhaust)
 		exhaust.setup(self, _layout.exhausts)
 		exhaust.on_pop = func(): _pop_level = 1.0
+		_build_sparks()
 	var effects := TireEffects.new()
 	add_child(effects)
 	effects.setup(self, _all_wheels, _rear_wheels)
@@ -350,6 +365,20 @@ func _physics_process(delta: float) -> void:
 	if _tail_glow:
 		_tail_glow.light_energy = 2.5 if brake_lit else 0.7
 
+	# Continuous scrape sparks and audio when rubbing against guardrails or opponents
+	var scraping := false
+	if contact_monitor and speed_kmh > 12.0:
+		for b in get_colliding_bodies():
+			if _is_obstacle(b):
+				scraping = true
+				break
+	if scraping:
+		_scrape_level = maxf(_scrape_level, 0.45)
+		if _spark_emitter and not _spark_emitter.emitting:
+			_spark_emitter.emitting = true
+	elif _spark_emitter and _scrape_level < 0.1:
+		_spark_emitter.emitting = false
+
 
 func _process(_delta: float) -> void:
 	# The column's local Y axis points back at the driver, so a positive turn is anticlockwise
@@ -374,14 +403,52 @@ func _update_engine_sound() -> void:
 	_engine_rasp.volume_db = linear_to_db(maxf(throttle * rev, 0.001) * 0.35)
 
 
-## Tire squeal and wind noise are generated, since they are mostly filtered noise.
+## Procedural synthesis for tire squeal, wind, backfires, turbo spool, blow-off valve, curb rumble, and scrape.
 func _fill_effects_sound() -> void:
 	var squeal := clampf((_skid - 0.35) * 2.0, 0.0, 1.0) * clampf(speed_kmh / 20.0, 0.0, 1.0)
 	var wind_level := clampf(speed_kmh / 200.0, 0.0, 1.0)
 	wind_level *= wind_level * 0.12
+
+	# Turbo spool calculation (builds boost above 2600 rpm under throttle)
+	var target_boost := clampf((rpm - 2600.0) / 4000.0, 0.0, 1.0) * throttle
+	_turbo_boost = move_toward(_turbo_boost, target_boost, 0.04)
+
+	# Detect sudden lift-off for blow-off valve (BOV) compressor flutter
+	if throttle < 0.2 and _prev_throttle > 0.6 and _turbo_boost > 0.35:
+		_bov_level = clampf(_turbo_boost * 1.1, 0.4, 1.0)
+		_bov_flutter = 0.0
+	_prev_throttle = throttle
+
+	var turbo_freq := lerpf(1800.0, 3900.0, _turbo_boost)
+	var rumble_level := 0.22 if on_curb and speed_kmh > 10.0 else 0.0
+
 	for i in _playback.get_frames_available():
 		_wind += (randf_range(-1.0, 1.0) - _wind) * 0.08
 		var out: float = _wind * wind_level
+
+		# Turbo spool whistle
+		if _turbo_boost > 0.05:
+			_turbo_phase = fmod(_turbo_phase + turbo_freq / _mix_rate, 1.0)
+			out += sin(_turbo_phase * TAU) * _turbo_boost * _turbo_boost * 0.022
+
+		# Turbo blow-off valve flutter ("stututu")
+		if _bov_level > 0.005:
+			_bov_flutter += 1.0 / _mix_rate
+			var mod := clampf(sin(_bov_flutter * TAU * 16.0) * 0.5 + 0.5, 0.15, 1.0)
+			out += randf_range(-1.0, 1.0) * _bov_level * mod * 0.09
+			_bov_level *= 0.99965
+
+		# Curb rumble low-frequency thumping
+		if rumble_level > 0.0:
+			var rumble_hz := clampf(speed_kmh * 1.1, 35.0, 85.0)
+			_rumble_phase = fmod(_rumble_phase + rumble_hz / _mix_rate, 1.0)
+			out += (1.0 if _rumble_phase < 0.35 else -0.3) * rumble_level * 0.08
+
+		# Collision scrape / metal grind
+		if _scrape_level > 0.01:
+			out += randf_range(-1.0, 1.0) * _scrape_level * 0.16
+			_scrape_level *= 0.9992
+
 		if _pop_level > 0.001:
 			# A backfire: a sharp crack of noise that dies away in about 60 ms.
 			out += randf_range(-1.0, 1.0) * _pop_level * 0.55
@@ -715,3 +782,56 @@ func _add_audio_player(stream: AudioStream) -> Node:
 	add_child(player)
 	player.play()
 	return player
+
+
+func _build_sparks() -> void:
+	_spark_emitter = GPUParticles3D.new()
+	_spark_emitter.amount = 24
+	_spark_emitter.lifetime = 0.28
+	_spark_emitter.explosiveness = 0.8
+	_spark_emitter.emitting = false
+	_spark_emitter.local_coords = false
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1.0, 0.85, 0.25)
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.7, 0.1)
+	mat.emission_energy_multiplier = 10.0
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.06, 0.06)
+	quad.material = mat
+	_spark_emitter.draw_pass_1 = quad
+	var p_mat := ParticleProcessMaterial.new()
+	p_mat.direction = Vector3(0.0, 0.8, -1.0)
+	p_mat.spread = 55.0
+	p_mat.initial_velocity_min = 6.0
+	p_mat.initial_velocity_max = 14.0
+	p_mat.gravity = Vector3(0.0, -12.0, 0.0)
+	p_mat.scale_min = 0.6
+	p_mat.scale_max = 1.2
+	_spark_emitter.process_material = p_mat
+	add_child(_spark_emitter)
+
+
+func _is_obstacle(node: Node) -> bool:
+	if not node:
+		return false
+	if node is VehicleBody3D:
+		return true
+	var n := node.name
+	return n.begins_with("Guardrail") or n.begins_with("Rock") or n.begins_with("Tree") or n.begins_with("Prop")
+
+
+func _on_body_entered(body: Node) -> void:
+	if not _is_obstacle(body):
+		return
+	var impact := linear_velocity.length()
+	if impact > 2.5:
+		_scrape_level = clampf(impact / 18.0, 0.35, 1.0)
+		if is_player:
+			collision_impact.emit(impact)
+			if _spark_emitter:
+				_spark_emitter.position = Vector3(randf_range(-0.8, 0.8), 0.4, randf_range(-1.2, 1.2))
+				_spark_emitter.restart()
+				_spark_emitter.emitting = true

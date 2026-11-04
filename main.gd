@@ -303,6 +303,10 @@ var best_label: Label
 var message_label: Label
 var message_timer := 0.0
 var current_time_of_day_index := 1
+var camera_shake := 0.0
+var shift_light_bar: HBoxContainer
+var shift_lights: Array[ColorRect] = []
+var _corners: Array[Vector3] = []
 
 
 func _ready() -> void:
@@ -353,6 +357,16 @@ func _physics_process(delta: float) -> void:
 	if flipped_time > 2.5 or car.global_position.y < -30.0:
 		_reset_car()
 
+	if car:
+		var offset := curve.get_closest_offset(car.global_position)
+		var t_xform := _track_transform(offset, 0.0)
+		var lateral_dist := absf((t_xform.affine_inverse() * car.global_position).x)
+		var on_kerb: bool = _is_in_corner(offset) and lateral_dist > (ROAD_HALF_WIDTH - 0.6) and lateral_dist < (ROAD_HALF_WIDTH + 1.4)
+		(car as CarScript).on_curb = on_kerb
+		if on_kerb:
+			var speed := car.linear_velocity.length()
+			camera_shake = maxf(camera_shake, clampf(speed / 30.0, 0.0, 1.0) * 0.045)
+
 	_update_camera(delta)
 
 
@@ -364,6 +378,7 @@ func _process(delta: float) -> void:
 	var car_script := car as CarScript
 	speed_label.text = "%d km/h" % roundi(car_script.speed_kmh)
 	gear_label.text = "Gear %s   %d rpm" % [car_script.gear_text(), roundi(car_script.rpm / 10.0) * 10]
+	_update_shift_lights()
 	if car in finish_order:
 		lap_label.text = "Finished P%d" % (finish_order.find(car) + 1)
 	else:
@@ -380,6 +395,28 @@ func _process(delta: float) -> void:
 	if message_timer > 0.0:
 		message_timer -= delta
 		message_label.modulate.a = clampf(message_timer, 0.0, 1.0)
+
+
+func _update_shift_lights() -> void:
+	if not car or shift_lights.is_empty():
+		return
+	var rpm: float = (car as CarScript).rpm
+	var redline: bool = rpm >= 6850.0
+	var flash: bool = fmod(Time.get_ticks_msec() / 65.0, 2.0) < 1.0
+	var thresholds := [3200.0, 3800.0, 4400.0, 5000.0, 5500.0, 6000.0, 6400.0, 6750.0, 7000.0]
+	var active_colors := [
+		Color(0.1, 0.9, 0.2), Color(0.1, 0.9, 0.2), Color(0.1, 0.9, 0.2),
+		Color(1.0, 0.75, 0.1), Color(1.0, 0.75, 0.1), Color(1.0, 0.75, 0.1),
+		Color(0.95, 0.15, 0.1), Color(0.95, 0.15, 0.1), Color(0.3, 0.6, 1.0)
+	]
+	var off_color := Color(0.12, 0.14, 0.16, 0.45)
+	for i in 9:
+		if redline and flash:
+			shift_lights[i].color = Color(1.0, 0.1, 0.1)
+		elif rpm >= thresholds[i]:
+			shift_lights[i].color = active_colors[i]
+		else:
+			shift_lights[i].color = off_color
 
 
 ## Index into TIMES_OF_DAY. Sunlight comes from where the sun is in the sky, so shadows match it.
@@ -603,6 +640,7 @@ func _build_terrain() -> void:
 	add_child(instance)
 
 	var body := StaticBody3D.new()
+	body.name = "Terrain"
 	var shape := CollisionShape3D.new()
 	var trimesh := mesh.create_trimesh_shape() as ConcavePolygonShape3D
 	trimesh.backface_collision = true
@@ -684,6 +722,7 @@ func _build_start_line() -> void:
 
 func _build_road_details() -> void:
 	var corners := _find_corners()
+	_corners = corners
 	var paint := StandardMaterial3D.new()
 	paint.albedo_color = Color(0.92, 0.92, 0.9)
 	paint.roughness = 0.6
@@ -743,6 +782,17 @@ func _find_corners() -> Array[Vector3]:
 	return corners
 
 
+func _is_in_corner(offset: float) -> bool:
+	for c in _corners:
+		if offset >= c.x and offset <= c.y:
+			return true
+	return false
+
+
+func _on_car_collision_impact(impact: float) -> void:
+	camera_shake = clampf(impact / 12.0, 0.12, 0.5)
+
+
 func _build_guardrails(corners: Array[Vector3]) -> void:
 	var steel := StandardMaterial3D.new()
 	steel.albedo_color = Color(0.62, 0.64, 0.66)
@@ -769,6 +819,7 @@ func _build_guardrails(corners: Array[Vector3]) -> void:
 	var rail_mesh := _add_mesh(rails, steel)
 
 	var body := StaticBody3D.new()
+	body.name = "Guardrail"
 	var shape := CollisionShape3D.new()
 	var trimesh := rail_mesh.create_trimesh_shape() as ConcavePolygonShape3D
 	trimesh.backface_collision = true
@@ -839,6 +890,7 @@ func _add_prop(size: Vector3, pos: Vector3, rot: Basis, material: Material) -> v
 	instance.transform = Transform3D(rot, pos)
 	add_child(instance)
 	var body := StaticBody3D.new()
+	body.name = "Prop"
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = size
@@ -901,6 +953,7 @@ func _build_trees() -> void:
 		variants.append(float(rng.randi_range(0, TREE_VARIANTS - 1)))
 		if d < 70.0:
 			var body := StaticBody3D.new()
+			body.name = "Tree"
 			var shape := CollisionShape3D.new()
 			var cylinder := CylinderShape3D.new()
 			cylinder.radius = 0.35 * s
@@ -1046,6 +1099,7 @@ func _build_rocks() -> void:
 				scaled.append(point * s)
 			shape.points = scaled
 			var body := StaticBody3D.new()
+			body.name = "Rock"
 			var collider := CollisionShape3D.new()
 			collider.shape = shape
 			body.add_child(collider)
@@ -1069,6 +1123,7 @@ func _spawn_car() -> void:
 			racer.rear_wing = true
 			racer.body_style = "custom"
 			car = racer
+			racer.collision_impact.connect(_on_car_collision_impact)
 		else:
 			var opponent: Dictionary = OPPONENTS[i]
 			racer.name = "AI " + opponent.name
@@ -1105,10 +1160,12 @@ func _update_camera(delta: float) -> void:
 			var z := -2.75 if looking_back else 2.6
 			camera.global_transform = car.global_transform * Transform3D(behind, Vector3(0.0, 0.75, z))
 			camera.fov = 78.0
+			_apply_camera_shake(delta)
 			return
 		"cockpit":
 			camera.global_transform = car.global_transform * Transform3D(behind, car.cockpit_offset())
 			camera.fov = 75.0
+			_apply_camera_shake(delta)
 			return
 
 	var view: Dictionary = CAMERA_VIEWS[camera_view]
@@ -1133,7 +1190,14 @@ func _update_camera(delta: float) -> void:
 		target = hit.position + (pivot - target).normalized() * 0.4
 	camera.global_position = camera.global_position.lerp(target, 1.0 - exp(-delta * (20.0 if hit or looking_back else 7.0)))
 	camera.look_at(car.global_position + forward * 4.0 + Vector3.UP * 0.9, Vector3.UP)
-	camera.fov = lerpf(camera.fov, 70.0 + clampf(speed * 0.3, 0.0, 18.0), 1.0 - exp(-delta * 3.0))
+	camera.fov = lerpf(camera.fov, 70.0 + clampf(speed * 0.35, 0.0, 16.0), 1.0 - exp(-delta * 3.0))
+	_apply_camera_shake(delta)
+
+
+func _apply_camera_shake(delta: float) -> void:
+	if camera_shake > 0.001:
+		camera.global_position += Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * camera_shake
+		camera_shake = move_toward(camera_shake, 0.0, delta * 3.5)
 
 
 ## Runs the countdown, tracks how far each car has driven, and works out positions and finishers.
@@ -1272,7 +1336,21 @@ func _build_hud() -> void:
 	gauges.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	gauges.offset_right = -32.0
 	gauges.offset_bottom = -24.0
+	gauges.alignment = BoxContainer.ALIGNMENT_END
 	layer.add_child(gauges)
+
+	shift_light_bar = HBoxContainer.new()
+	shift_light_bar.alignment = BoxContainer.ALIGNMENT_END
+	shift_light_bar.add_theme_constant_override("separation", 4)
+	gauges.add_child(shift_light_bar)
+	shift_lights.clear()
+	for i in 9:
+		var led := ColorRect.new()
+		led.custom_minimum_size = Vector2(16.0, 7.0)
+		led.color = Color(0.12, 0.14, 0.16, 0.5)
+		shift_light_bar.add_child(led)
+		shift_lights.append(led)
+
 	speed_label = _make_label(gauges, 64)
 	gear_label = _make_label(gauges, 22)
 	speed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
