@@ -13,6 +13,11 @@ Other changes made in `car.gd` at load time:
 - Restored the paint's clearcoat and the tiling of the paint-flake detail map, which Godot's importer drops.
 - Moved the ambient-shadow map onto the model's second UV set.
 
+## Lamborghini Centenario (Player Car)
+
+"Lamborghini Centenario LP-770 Interior SDC" by SDC PERFORMANCE™️ (https://sketchfab.com/3Duae), from [Sketchfab](https://sketchfab.com/3d-models/lamborghini-centenario-lp-770-interior-sdc-d679af35b5694301a185c7454a700c73).
+Licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/).
+
 ## Your car
 
 The player's car body was generated from your own image (`supercar_burnout_twilight`, made in Antigravity) with [Hunyuan3D-2.1](https://huggingface.co/spaces/tencent/Hunyuan3D-2.1) by Tencent, then cleaned up in `models/your_car`: the ground and smoke under it were cut away, the fused-in wheels removed, and it was scaled to real size. It rides on the Car Concept's wheels. Paint, glass and lights are added by a shader in `car.gd`. Hunyuan3D outputs are covered by the Tencent Hunyuan 3D 2.1 Community License, which excludes use in the EU, UK and South Korea.

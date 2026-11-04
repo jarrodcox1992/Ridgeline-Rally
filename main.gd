@@ -1121,7 +1121,7 @@ func _spawn_car() -> void:
 			racer.paint_color = PLAYER_PAINT
 			racer.rim_color = Color(0.03, 0.03, 0.035)
 			racer.rear_wing = true
-			racer.body_style = "custom"
+			racer.body_style = "centenario"
 			car = racer
 			racer.collision_impact.connect(_on_car_collision_impact)
 		else:

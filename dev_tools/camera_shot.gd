@@ -2,7 +2,7 @@ extends SceneTree
 # Drives with the autopilot and screenshots each camera view, plus look-back.
 var main: Node3D
 var t := 0.0
-var shots := [[9.0, 0, false, "cam_chase"], [9.6, 1, false, "cam_far"], [10.2, 2, false, "cam_bumper"], [10.8, 0, true, "cam_lookback"]]
+var shots := [[9.0, 0, false, "cam_chase"], [9.6, 1, false, "cam_far"], [10.2, 2, false, "cam_bumper"], [10.8, 3, false, "cam_cockpit"], [11.4, 0, true, "cam_lookback"]]
 var pending: Array = []
 func _initialize() -> void:
 	main = load("res://main.tscn").instantiate()

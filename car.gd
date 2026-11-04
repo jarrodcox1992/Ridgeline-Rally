@@ -4,6 +4,7 @@ extends VehicleBody3D
 ## The car's forward direction is local +Z.
 
 const CarModel := preload("res://models/car_concept.glb")
+const CentenarioModel := preload("res://models/lamborghini_centenario/centenario.tscn")
 const TireEffects := preload("res://tire_effects.gd")
 const EngineLoop := preload("res://sounds/engine_loop.wav")
 const ExhaustScript := preload("res://exhaust.gd")
@@ -94,6 +95,18 @@ const BODIES := {
 		"tail_glow": Vector3(0.0, 0.65, -2.55),
 		"exhausts": [Vector3(0.32, 0.45, -2.42), Vector3(-0.32, 0.45, -2.42)],
 		"cockpit": Vector3(0.0, 1.0, 1.25), # over the bonnet; the generated body has no interior
+	},
+	"centenario": {
+		"wheels": {
+			"WheelFrontL": Vector3(0.853, 0.381, 1.211), "WheelFrontR": Vector3(-0.861, 0.381, 1.184),
+			"WheelRearL": Vector3(0.849, 0.396, -1.494), "WheelRearR": Vector3(-0.849, 0.396, -1.494),
+		},
+		"wheel_radius": 0.37,
+		"collision": [[Vector3(2.06, 0.52, 4.95), Vector3(0.0, 0.45, 0.0)], [Vector3(1.6, 0.36, 2.1), Vector3(0.0, 0.95, -0.1)]],
+		"headlights": [Vector3(0.68, 0.58, 2.15), Vector3(-0.68, 0.58, 2.15)],
+		"tail_glow": Vector3(0.0, 0.65, -2.52),
+		"exhausts": [Vector3(0.08, 0.38, -2.45), Vector3(-0.08, 0.38, -2.45)],
+		"cockpit": Vector3(0.42, 0.88, -0.15),
 	},
 }
 const CUSTOM_BODY_MESH := "res://models/your_car/your_car_body.res"
@@ -195,10 +208,36 @@ var _skid := 0.0
 var _engine # AudioStreamPlayer for the player, AudioStreamPlayer3D for AI cars
 var _engine_rasp
 var _playback: AudioStreamGeneratorPlayback
-var _mix_rate := 22050.0
-var _squeal_phase := 0.0
-var _wind := 0.0
+var _mix_rate := 44100.0
+
+# V12 Acoustic Firing & Induction Synthesis
+var _v12_phase := 0.0
+var _v12_sub_phase := 0.0
+
+# Transmission Dog-Gear Whine
+var _gear_whine_phase := 0.0
+
+# Granular Multi-Stage Tire Physics
+var _tire_scrub_noise := 0.0
+var _squeal_phase1 := 0.0
+var _squeal_phase2 := 0.0
+var _squeal_jitter := 0.0
+
+# Concussive Exhaust Backfires & Overrun Burbles
 var _pop_level := 0.0
+var _pop_boom_phase := 0.0
+var _overrun_burble_phase := 0.0
+var _overrun_level := 0.0
+
+# Aerodynamic Wind Buffeting & Stereo Air Rush
+var _wind_l := 0.0
+var _wind_r := 0.0
+var _buffet_phase := 0.0
+
+# Rev Limiter Staccato Ignition Cut & Downshift Blip
+var _limiter_stutter := 0.0
+var _ignition_cut := false
+var _downshift_blip := 0.0
 
 
 func _ready() -> void:
@@ -214,7 +253,11 @@ func _ready() -> void:
 	_layout = BODIES[body_style]
 	for box: Array in _layout.collision:
 		_add_collision(box[0], box[1])
-	var model := CarModel.instantiate() as Node3D
+	var model: Node3D
+	if body_style == "centenario":
+		model = CentenarioModel.instantiate() as Node3D
+	else:
+		model = CarModel.instantiate() as Node3D
 	add_child(model)
 	_fix_materials(model)
 	if not is_player:
@@ -397,66 +440,175 @@ func _update_engine_sound() -> void:
 	var rev := clampf((rpm - IDLE_RPM) / (REDLINE_RPM - IDLE_RPM), 0.0, 1.0)
 	var pitch := lerpf(ENGINE_PITCH_IDLE, ENGINE_PITCH_REDLINE, rev)
 	_engine.pitch_scale = pitch
-	_engine.volume_db = lerpf(-12.0, -3.0, maxf(throttle, rev * 0.5))
-	# An octave-up copy fades in under load for a harder, raspier note.
-	_engine_rasp.pitch_scale = pitch * 2.0
-	_engine_rasp.volume_db = linear_to_db(maxf(throttle * rev, 0.001) * 0.35)
+	_engine.volume_db = lerpf(-12.0, -2.5, maxf(throttle, rev * 0.5))
+	if _ignition_cut:
+		_engine.volume_db -= 8.0 # sudden torque/spark cut during limiter bounce
+
+	# High-frequency exhaust rasp: pitches harmonically with revs and roars under throttle
+	_engine_rasp.pitch_scale = pitch * 1.5
+	_engine_rasp.volume_db = lerpf(-26.0, -5.0, throttle * rev)
+	if _ignition_cut:
+		_engine_rasp.volume_db -= 12.0
 
 
 ## Procedural synthesis for tire squeal, wind, backfires, turbo spool, blow-off valve, curb rumble, and scrape.
 func _fill_effects_sound() -> void:
-	var squeal := clampf((_skid - 0.35) * 2.0, 0.0, 1.0) * clampf(speed_kmh / 20.0, 0.0, 1.0)
-	var wind_level := clampf(speed_kmh / 200.0, 0.0, 1.0)
-	wind_level *= wind_level * 0.12
+	if _playback == null:
+		return
+	var frames: int = _playback.get_frames_available()
+	if frames <= 0:
+		return
 
-	# Turbo spool calculation (builds boost above 2600 rpm under throttle)
-	var target_boost := clampf((rpm - 2600.0) / 4000.0, 0.0, 1.0) * throttle
+	var rev := clampf((rpm - IDLE_RPM) / (REDLINE_RPM - IDLE_RPM), 0.0, 1.0)
+
+	# 1. Granular Tire Physics (Pre-skid scrub + dual-frequency sliding screech)
+	var scrub_amount := clampf((_skid - 0.12) * 3.5, 0.0, 1.0) * clampf(speed_kmh / 15.0, 0.0, 1.0)
+	var squeal_amount := clampf((_skid - 0.35) * 2.2, 0.0, 1.0) * clampf(speed_kmh / 18.0, 0.0, 1.0)
+	if burnout:
+		squeal_amount = 1.0
+		scrub_amount = 1.0
+
+	# 2. Aerodynamic Wind & Atmospheric Buffeting
+	var wind_speed_norm := clampf(speed_kmh / 260.0, 0.0, 1.0)
+	var wind_level := wind_speed_norm * wind_speed_norm * 0.16
+	var buffet_level := clampf((speed_kmh - 130.0) / 130.0, 0.0, 1.0) * 0.055
+
+	# 3. Turbocharger Spool & BOV Flutter
+	var target_boost := clampf((rpm - 2400.0) / 4200.0, 0.0, 1.0) * throttle
 	_turbo_boost = move_toward(_turbo_boost, target_boost, 0.04)
-
-	# Detect sudden lift-off for blow-off valve (BOV) compressor flutter
-	if throttle < 0.2 and _prev_throttle > 0.6 and _turbo_boost > 0.35:
-		_bov_level = clampf(_turbo_boost * 1.1, 0.4, 1.0)
+	if throttle < 0.2 and _prev_throttle > 0.6 and _turbo_boost > 0.3:
+		_bov_level = clampf(_turbo_boost * 1.25, 0.45, 1.0)
 		_bov_flutter = 0.0
 	_prev_throttle = throttle
+	var turbo_freq := lerpf(2000.0, 4400.0, _turbo_boost)
 
-	var turbo_freq := lerpf(1800.0, 3900.0, _turbo_boost)
-	var rumble_level := 0.22 if on_curb and speed_kmh > 10.0 else 0.0
+	# 4. Transmission Straight-Cut Dog Gear Whine
+	var gear_freq := clampf(speed_kmh * 16.5, 80.0, 4200.0)
+	var gear_whine_level := clampf(speed_kmh / 180.0, 0.0, 1.0) * lerpf(0.12, 1.0, throttle) * 0.038
 
-	for i in _playback.get_frames_available():
-		_wind += (randf_range(-1.0, 1.0) - _wind) * 0.08
-		var out: float = _wind * wind_level
+	# 5. V12 Combustion Firing Frequency (6 pulses per rev)
+	var v12_f0 := clampf(rpm / 10.0, 80.0, 850.0)
 
-		# Turbo spool whistle
+	# 6. Overrun Exhaust Burble
+	if throttle < 0.08 and rpm > 3200.0 and speed_kmh > 20.0:
+		_overrun_level = move_toward(_overrun_level, 0.75, 0.08)
+	else:
+		_overrun_level = move_toward(_overrun_level, 0.0, 0.04)
+
+	# 7. Curb Rumble Level
+	var rumble_level := 0.26 if on_curb and speed_kmh > 10.0 else 0.0
+	var rumble_hz := clampf(speed_kmh * 1.2, 38.0, 92.0)
+
+	var inv_sr := 1.0 / _mix_rate
+
+	for i in frames:
+		_squeal_jitter += inv_sr * 8.0
+
+		# Wind Stereo Noise
+		_wind_l += (randf_range(-1.0, 1.0) - _wind_l) * 0.06
+		_wind_r += (randf_range(-1.0, 1.0) - _wind_r) * 0.06
+		var out_l := _wind_l * wind_level
+		var out_r := _wind_r * wind_level
+
+		# High-speed aerodynamic buffeting (low-frequency cabin flutter)
+		if buffet_level > 0.001:
+			_buffet_phase = fmod(_buffet_phase + 52.0 * inv_sr, 1.0)
+			var buff := sin(_buffet_phase * TAU) * buffet_level
+			out_l += buff
+			out_r += buff * 0.85
+
+		# V12 Physical Combustion & High-RPM Screaming Harmonics
+		_v12_phase = fmod(_v12_phase + v12_f0 * inv_sr, 1.0)
+		_v12_sub_phase = fmod(_v12_sub_phase + (v12_f0 * 0.5) * inv_sr, 1.0)
+		# Fundamental combustion pulse + 2nd + 3rd harmonic
+		var pulse := sin(_v12_phase * TAU) + 0.42 * sin(_v12_phase * 2.0 * TAU) + 0.22 * sin(_v12_phase * 3.0 * TAU)
+		# Italian V12 high-RPM metallic scream (4th + 6th order harmonics)
+		var scream := (sin(_v12_phase * 4.0 * TAU) * 0.45 + sin(_v12_phase * 6.0 * TAU) * 0.3) * (rev * rev)
+		# Sub-bass engine displacement thrum (50-100 Hz punch)
+		var sub_thrum := sin(_v12_sub_phase * TAU) * 0.14 * (1.0 - rev * 0.4)
+		var v12_synth := (pulse * 0.55 + scream * 0.65 + sub_thrum) * (0.045 + throttle * 0.075)
+		if _ignition_cut:
+			v12_synth *= 0.15 # cut spark during limiter bounce
+		out_l += v12_synth
+		out_r += v12_synth
+
+		# Transmission Straight-Cut Gear Whine (with stereo phase offset)
+		if gear_whine_level > 0.001:
+			_gear_whine_phase = fmod(_gear_whine_phase + gear_freq * inv_sr, 1.0)
+			var whine_base := sin(_gear_whine_phase * TAU) + 0.28 * sin(_gear_whine_phase * 2.0 * TAU)
+			var whine_r := sin((_gear_whine_phase + 0.08) * TAU) + 0.28 * sin((_gear_whine_phase + 0.08) * 2.0 * TAU)
+			out_l += whine_base * gear_whine_level
+			out_r += whine_r * gear_whine_level
+
+		# Tire Scrub (edge-of-grip asphalt tearing)
+		if scrub_amount > 0.01:
+			_tire_scrub_noise += (randf_range(-1.0, 1.0) - _tire_scrub_noise) * 0.3
+			var scrub_sound := _tire_scrub_noise * scrub_amount * 0.045
+			out_l += scrub_sound
+			out_r += scrub_sound
+
+		# Tire Screech (chaotic dual-tone slide with rubber friction frequency modulation)
+		if squeal_amount > 0.01:
+			var j1 := sin(_squeal_jitter * 28.0) * 55.0
+			var j2 := cos(_squeal_jitter * 19.0) * 75.0
+			_squeal_phase1 = fmod(_squeal_phase1 + (760.0 + j1) * inv_sr, 1.0)
+			_squeal_phase2 = fmod(_squeal_phase2 + (1380.0 + j2) * inv_sr, 1.0)
+			var screech := (sin(_squeal_phase1 * TAU) * 0.65 + sin(_squeal_phase2 * TAU) * 0.35 + randf_range(-0.25, 0.25)) * squeal_amount * 0.085
+			out_l += screech
+			out_r += screech * 0.95
+
+		# Turbo Spool Whistle
 		if _turbo_boost > 0.05:
-			_turbo_phase = fmod(_turbo_phase + turbo_freq / _mix_rate, 1.0)
-			out += sin(_turbo_phase * TAU) * _turbo_boost * _turbo_boost * 0.022
+			_turbo_phase = fmod(_turbo_phase + turbo_freq * inv_sr, 1.0)
+			var spool := (sin(_turbo_phase * TAU) + 0.25 * sin(_turbo_phase * 2.0 * TAU)) * _turbo_boost * _turbo_boost * 0.026
+			out_l += spool * 0.8
+			out_r += spool * 1.0 # slight right bias
 
-		# Turbo blow-off valve flutter ("stututu")
+		# Blow-off Valve Flutter ("stututu-tu-tu")
 		if _bov_level > 0.005:
-			_bov_flutter += 1.0 / _mix_rate
-			var mod := clampf(sin(_bov_flutter * TAU * 16.0) * 0.5 + 0.5, 0.15, 1.0)
-			out += randf_range(-1.0, 1.0) * _bov_level * mod * 0.09
-			_bov_level *= 0.99965
+			_bov_flutter += inv_sr
+			var mod := clampf(sin(_bov_flutter * TAU * 17.0) * 0.5 + 0.5, 0.1, 1.0)
+			var bov_chirp := sin(fmod(_bov_flutter * 2400.0 * exp(-_bov_flutter * 3.5), 1.0) * TAU) * 0.4 + randf_range(-0.6, 0.6)
+			var bov_out := bov_chirp * _bov_level * mod * 0.085
+			out_l += bov_out * 0.7
+			out_r += bov_out * 1.0
+			_bov_level *= 0.9997
 
-		# Curb rumble low-frequency thumping
+		# Overrun Exhaust Burbles & Gurgles
+		if _overrun_level > 0.01:
+			_overrun_burble_phase = fmod(_overrun_burble_phase + (v12_f0 * 0.35 + randf_range(-15.0, 15.0)) * inv_sr, 1.0)
+			var burble := (sin(_overrun_burble_phase * TAU) + randf_range(-0.35, 0.35)) * _overrun_level * 0.038
+			out_l += burble
+			out_r += burble * 1.1
+
+		# Concussive Exhaust Backfires (Impulse Crack + Sub-Bass Boom)
+		if _pop_level > 0.001:
+			_pop_boom_phase = fmod(_pop_boom_phase + 105.0 * inv_sr, 1.0)
+			var boom := sin(_pop_boom_phase * TAU) * _pop_level * 0.38
+			var crack := randf_range(-1.0, 1.0) * _pop_level * 0.52
+			var pop_out := boom + crack
+			out_l += pop_out * 0.9
+			out_r += pop_out * 1.1
+			_pop_level *= 0.9984
+
+		# Curb Rumble / Kerb Clatter
 		if rumble_level > 0.0:
-			var rumble_hz := clampf(speed_kmh * 1.1, 35.0, 85.0)
-			_rumble_phase = fmod(_rumble_phase + rumble_hz / _mix_rate, 1.0)
-			out += (1.0 if _rumble_phase < 0.35 else -0.3) * rumble_level * 0.08
+			_rumble_phase = fmod(_rumble_phase + rumble_hz * inv_sr, 1.0)
+			var curb_thump := (1.0 if _rumble_phase < 0.32 else -0.28) * rumble_level * 0.09
+			out_l += curb_thump
+			out_r += curb_thump
 
-		# Collision scrape / metal grind
+		# Collision Scrape / Metal Grinding
 		if _scrape_level > 0.01:
-			out += randf_range(-1.0, 1.0) * _scrape_level * 0.16
+			var scrape := randf_range(-1.0, 1.0) * _scrape_level * 0.18
+			out_l += scrape
+			out_r += scrape
 			_scrape_level *= 0.9992
 
-		if _pop_level > 0.001:
-			# A backfire: a sharp crack of noise that dies away in about 60 ms.
-			out += randf_range(-1.0, 1.0) * _pop_level * 0.55
-			_pop_level *= 0.9985
-		if squeal > 0.0:
-			_squeal_phase = fmod(_squeal_phase + randf_range(820.0, 900.0) / _mix_rate, 1.0)
-			out += sin(_squeal_phase * TAU) * squeal * 0.08
-		_playback.push_frame(Vector2(out, out))
+		# Final Soft Saturation / Master Limiter
+		out_l = clampf(out_l, -0.95, 0.95)
+		out_r = clampf(out_r, -0.95, 0.95)
+		_playback.push_frame(Vector2(out_l, out_r))
 
 
 func set_headlights(on: bool) -> void:
@@ -486,6 +638,7 @@ func gear_text() -> String:
 
 
 func _update_rpm(abs_speed: float, delta: float) -> void:
+	var prev_gear := gear
 	gear = GEAR_TOP_SPEEDS.size()
 	for i in GEAR_TOP_SPEEDS.size():
 		var top: float = GEAR_TOP_SPEEDS[i]
@@ -499,7 +652,35 @@ func _update_rpm(abs_speed: float, delta: float) -> void:
 		target = 5800.0 + randf_range(-250.0, 250.0)
 	elif abs_speed < 1.0:
 		target = IDLE_RPM + throttle * 2500.0
-	rpm = lerpf(rpm, target, 1.0 - exp(-delta * 10.0))
+
+	# Rev-limiter bounce (staccato ignition cut at redline under heavy throttle)
+	if target >= REDLINE_RPM - 40.0 and throttle > 0.8:
+		_limiter_stutter += delta * 24.0
+		if fmod(_limiter_stutter, 1.0) < 0.45:
+			_ignition_cut = true
+			target -= 280.0
+			if randf() < 0.35:
+				_pop_level = 0.85
+		else:
+			_ignition_cut = false
+	else:
+		_ignition_cut = false
+		_limiter_stutter = 0.0
+
+	# Downshift rev-matching throttle blip & upshift pop
+	if gear < prev_gear and not frozen:
+		_downshift_blip = 1.0
+		if is_player and randf() < 0.65:
+			_pop_level = maxf(_pop_level, 0.75)
+	elif gear > prev_gear and throttle > 0.5 and not frozen:
+		if is_player:
+			_pop_level = maxf(_pop_level, 0.95)
+
+	if _downshift_blip > 0.0:
+		target += _downshift_blip * 950.0
+		_downshift_blip = maxf(_downshift_blip - delta * 5.0, 0.0)
+
+	rpm = lerpf(rpm, target, 1.0 - exp(-delta * 12.0))
 
 
 func _add_collision(size: Vector3, pos: Vector3) -> void:
@@ -542,7 +723,7 @@ func _add_wheel(model: Node3D, wheel_name: String, centre: Vector3, radius: floa
 	var body_axes := (global_transform.affine_inverse() * visual.get_parent_node_3d().global_transform).basis
 	visual.reparent(wheel, false)
 	# The Car Concept's wheels are scaled to fit other bodies' wheel arches.
-	var fit := radius / WHEEL_RADIUS
+	var fit := 1.0 if body_style == "centenario" else (radius / WHEEL_RADIUS)
 	visual.transform = Transform3D(body_axes.scaled(Vector3.ONE * fit), Vector3.ZERO)
 	_add_wheel_blur(wheel, signf(centre.x) * fit)
 
@@ -581,6 +762,19 @@ func _add_wheel_blur(wheel: VehicleWheel3D, side: float) -> void:
 
 
 func _fix_materials(model: Node) -> void:
+	if body_style == "centenario":
+		for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
+			var mi := mesh_instance as MeshInstance3D
+			for i in mi.mesh.get_surface_count():
+				var material := mi.mesh.surface_get_material(i) as StandardMaterial3D
+				if material == null:
+					continue
+				if material.resource_name == "LIGT_RED":
+					_brake_light_material = material
+				elif material.resource_name == "LIGT_BLC":
+					_headlight_material = material
+		return
+
 	for node_name: String in LOGO_NODES:
 		var logo := model.find_child(node_name, true, false) as Node3D
 		if logo:
