@@ -15,6 +15,7 @@ Open Godot, click **Import**, choose this folder's `project.godot`, then press *
 | Steer | A / D, Left / Right | Left stick |
 | Handbrake (drift) | Space | A |
 | Reset car to road | R | Y |
+| Next track (cycle circuits) | T | |
 | Switch camera (chase / far chase / bumper / cockpit) | C | Back |
 | Look back | B (hold) | Left shoulder |
 | Headlights | H | D-pad up |
@@ -25,7 +26,7 @@ Open Godot, click **Import**, choose this folder's `project.godot`, then press *
 
 ## Files
 
-- `main.gd` builds the world: terrain, road, trees, lighting, checkpoints, lap timing, camera and HUD. The track shape is `TRACK_POINTS` at the top.
+- `main.gd` builds the world: terrain, road, trees, lighting, checkpoints, lap timing, camera and HUD. Multi-track layouts (Alpine Pass, Mount Akina Touge, Coastal Super-Speedway, Forest Grand Prix) with real 3D elevation and verticality are configured in `TRACK_DATA`.
 - `car.gd` handles car physics tuning and controls. It also loads the 3D model, attaches its wheels to the physics wheels, fixes materials, pitches the engine loop, and synthesizes the tire, wind and backfire sounds.
 - `models/` holds the car model and its license.
 - `ai_driver.gd` drives the opponents: follows the track, brakes for corners ahead, and overtakes.

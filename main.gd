@@ -8,12 +8,55 @@ const PauseMenuScript := preload("res://pause_menu.gd")
 const AIDriverScript := preload("res://ai_driver.gd")
 const PhotoModeScript := preload("res://photo_mode.gd")
 
-## Track centreline in metres (x, z). The loop closes back to the first point.
-const TRACK_POINTS := [
-	Vector2(0, -200), Vector2(120, -210), Vector2(220, -150), Vector2(250, -40),
-	Vector2(200, 40), Vector2(110, 50), Vector2(60, 120), Vector2(90, 210),
-	Vector2(20, 260), Vector2(-110, 240), Vector2(-200, 170), Vector2(-230, 60),
-	Vector2(-160, -30), Vector2(-200, -120), Vector2(-120, -190),
+## Multi-track data definitions with 3D coordinates (x, y, z) in metres.
+const TRACK_DATA := [
+	{
+		"name": "Alpine Pass",
+		"desc": "Flowing mountain pass with rolling crests and valley dips",
+		"points": [
+			Vector3(0.0, 0.0, -200.0), Vector3(120.0, 5.0, -210.0), Vector3(220.0, 14.0, -150.0),
+			Vector3(250.0, 18.0, -40.0), Vector3(200.0, 12.0, 40.0), Vector3(110.0, 2.0, 50.0),
+			Vector3(60.0, -6.0, 120.0), Vector3(90.0, -4.0, 210.0), Vector3(20.0, 3.0, 260.0),
+			Vector3(-110.0, 12.0, 240.0), Vector3(-200.0, 8.0, 170.0), Vector3(-230.0, 0.0, 60.0),
+			Vector3(-160.0, -6.0, -30.0), Vector3(-200.0, -4.0, -120.0), Vector3(-120.0, -1.0, -190.0),
+		],
+	},
+	{
+		"name": "Mount Akina Touge",
+		"desc": "Downhill mountain pass with tight switchbacks and 72m vertical drop",
+		"points": [
+			Vector3(0.0, 42.0, -290.0), Vector3(140.0, 40.0, -290.0), Vector3(260.0, 34.0, -230.0),
+			Vector3(290.0, 28.0, -130.0), Vector3(210.0, 22.0, -60.0), Vector3(100.0, 16.0, -50.0),
+			Vector3(60.0, 10.0, 30.0), Vector3(140.0, 4.0, 90.0), Vector3(230.0, -2.0, 100.0),
+			Vector3(270.0, -10.0, 170.0), Vector3(200.0, -18.0, 240.0), Vector3(80.0, -26.0, 280.0),
+			Vector3(-40.0, -30.0, 290.0), Vector3(-160.0, -26.0, 260.0), Vector3(-250.0, -16.0, 190.0),
+			Vector3(-290.0, -4.0, 90.0), Vector3(-270.0, 10.0, -20.0), Vector3(-290.0, 22.0, -120.0),
+			Vector3(-240.0, 32.0, -210.0), Vector3(-120.0, 39.0, -270.0),
+		],
+	},
+	{
+		"name": "Coastal Super-Speedway",
+		"desc": "High-speed drafting circuit with 300+ km/h straights and banked bends",
+		"points": [
+			Vector3(-100.0, 0.0, -320.0), Vector3(100.0, 2.0, -320.0), Vector3(260.0, 6.0, -290.0),
+			Vector3(360.0, 12.0, -180.0), Vector3(380.0, 16.0, -40.0), Vector3(340.0, 18.0, 100.0),
+			Vector3(240.0, 22.0, 220.0), Vector3(100.0, 14.0, 290.0), Vector3(-60.0, 4.0, 310.0),
+			Vector3(-200.0, -8.0, 270.0), Vector3(-310.0, -5.0, 170.0), Vector3(-360.0, 0.0, 30.0),
+			Vector3(-340.0, 2.0, -120.0), Vector3(-240.0, 1.0, -240.0),
+		],
+	},
+	{
+		"name": "Forest Grand Prix",
+		"desc": "FIA-grade technical road course with chicanes, blind crests and plunging esses",
+		"points": [
+			Vector3(0.0, 0.0, -240.0), Vector3(130.0, 3.0, -240.0), Vector3(230.0, 8.0, -170.0),
+			Vector3(270.0, 14.0, -70.0), Vector3(200.0, 18.0, 0.0), Vector3(260.0, 24.0, 80.0),
+			Vector3(190.0, 18.0, 170.0), Vector3(100.0, 4.0, 250.0), Vector3(-20.0, -8.0, 280.0),
+			Vector3(-130.0, -16.0, 250.0), Vector3(-220.0, -10.0, 170.0), Vector3(-270.0, 0.0, 80.0),
+			Vector3(-260.0, 8.0, -20.0), Vector3(-150.0, 5.0, -90.0), Vector3(-160.0, 2.0, -165.0),
+			Vector3(-100.0, 0.0, -220.0),
+		],
+	},
 ]
 const ROAD_HALF_WIDTH := 7.0
 const ROAD_HEIGHT := 0.12
@@ -32,7 +75,7 @@ const GRASS_CHUNK_LENGTH := 60.0
 const ROCK_MODELS := ["res://models/rock_moss_set_01/rock_moss_set_01.gltf", "res://models/boulder_01/boulder_01.gltf"]
 const DASH_LENGTH := 3.0
 const DASH_GAP := 6.0
-const CORNER_TURN := 0.14 # radians of heading change over 16 m that counts as a corner
+const CORNER_TURN := 0.08 # radians of heading change over 16 m that counts as a corner
 const KERB_SEGMENT := 1.5
 const GUARDRAIL_OFFSET := 12.0
 const ROCK_COUNT := 140
@@ -307,6 +350,12 @@ var camera_shake := 0.0
 var shift_light_bar: HBoxContainer
 var shift_lights: Array[ColorRect] = []
 var _corners: Array[Vector3] = []
+var current_track_index := 0
+var _track_root: Node3D
+var minimap_ctrl: Control
+var _track_bounds_min := Vector2(-400.0, -400.0)
+var _track_bounds_max := Vector2(400.0, 400.0)
+var current_quality_level := 1
 
 
 func _ready() -> void:
@@ -314,8 +363,17 @@ func _ready() -> void:
 	noise.seed = 7
 	noise.frequency = 0.004
 	noise.fractal_octaves = 5
-	_build_track_curve()
+
+	var settings := ConfigFile.new()
+	settings.load("user://settings.cfg")
+	current_track_index = clampi(settings.get_value("race", "track", 0), 0, TRACK_DATA.size() - 1)
+
 	_build_environment()
+	_track_root = Node3D.new()
+	_track_root.name = "TrackRoot"
+	add_child(_track_root)
+
+	_build_track_curve()
 	_build_terrain()
 	_build_road()
 	_build_start_line()
@@ -333,7 +391,7 @@ func _ready() -> void:
 	var photo := PhotoModeScript.new()
 	add_child(photo)
 	photo.setup(self)
-	_show_message("3", 1.4)
+	_show_message(TRACK_DATA[current_track_index].name, 2.0)
 
 
 func _physics_process(delta: float) -> void:
@@ -341,6 +399,8 @@ func _physics_process(delta: float) -> void:
 		lap_time += delta
 	_update_race(delta)
 
+	if Input.is_action_just_pressed("next_track"):
+		load_track((current_track_index + 1) % TRACK_DATA.size())
 	if Input.is_action_just_pressed("reset_car"):
 		_reset_car()
 	if Input.is_action_just_pressed("show_fps"):
@@ -462,6 +522,7 @@ func set_difficulty(level: int) -> void:
 ## 0 = Low, 1 = Medium, 2 = High. Trades shadows, ambient occlusion, grass and
 ## render resolution for frame rate.
 func apply_quality(level: int) -> void:
+	current_quality_level = level
 	var viewport := get_viewport()
 	viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
 	viewport.scaling_3d_scale = [0.7, 1.0, 1.0][level]
@@ -490,6 +551,7 @@ func _setup_input() -> void:
 	_add_action("steer_right", [KEY_D, KEY_RIGHT], [], [[JOY_AXIS_LEFT_X, 1.0]])
 	_add_action("handbrake", [KEY_SPACE], [JOY_BUTTON_A], [])
 	_add_action("reset_car", [KEY_R], [JOY_BUTTON_Y], [])
+	_add_action("next_track", [KEY_T], [], [])
 	_add_action("camera", [KEY_C], [JOY_BUTTON_BACK], [])
 	_add_action("headlights", [KEY_H], [JOY_BUTTON_DPAD_UP], [])
 	_add_action("look_back", [KEY_B], [JOY_BUTTON_LEFT_SHOULDER], [])
@@ -522,19 +584,30 @@ func _add_action(action: StringName, keys: Array, buttons: Array, axes: Array) -
 func _build_track_curve() -> void:
 	curve = Curve3D.new()
 	curve.bake_interval = 2.0
-	var n := TRACK_POINTS.size()
-	# Repeat the first point at the end so the loop closes smoothly.
+	var points: Array = TRACK_DATA[current_track_index].points
+	var n := points.size()
+	var min_x := 1.0e9
+	var max_x := -1.0e9
+	var min_z := 1.0e9
+	var max_z := -1.0e9
+	# Repeat the first point at the end so the loop closes smoothly in 3D.
 	for i in n + 1:
-		var p: Vector2 = TRACK_POINTS[i % n]
-		var prev: Vector2 = TRACK_POINTS[(i - 1 + n) % n]
-		var next: Vector2 = TRACK_POINTS[(i + 1) % n]
+		var p: Vector3 = points[i % n]
+		var prev: Vector3 = points[(i - 1 + n) % n]
+		var next: Vector3 = points[(i + 1) % n]
 		var handle := (next - prev) * 0.22
-		curve.add_point(Vector3(p.x, 0.0, p.y), Vector3(-handle.x, 0.0, -handle.y), Vector3(handle.x, 0.0, handle.y))
+		curve.add_point(p, -handle, handle)
+		min_x = minf(min_x, p.x)
+		max_x = maxf(max_x, p.x)
+		min_z = minf(min_z, p.z)
+		max_z = maxf(max_z, p.z)
+	_track_bounds_min = Vector2(min_x, min_z)
+	_track_bounds_max = Vector2(max_x, max_z)
 	track_length = curve.get_baked_length()
 	track_path = Path3D.new()
 	track_path.name = "TrackPath"
 	track_path.curve = curve
-	add_child(track_path)
+	_track_root.add_child(track_path)
 
 
 func _track_point(offset: float) -> Vector3:
@@ -545,27 +618,43 @@ func _track_dir(offset: float) -> Vector3:
 	return (_track_point(offset + 2.0) - _track_point(offset - 2.0)).normalized()
 
 
-## The basis's +Z points along the track and +X to the driver's left.
+## The basis's +Z points along the track, +X to the driver's left, and +Y along the road normal.
 func _track_transform(offset: float, height: float) -> Transform3D:
 	var dir := _track_dir(offset)
-	# looking_at points -Z at the target, so aim backwards to make +Z face along the track.
-	return Transform3D(Basis.looking_at(-dir, Vector3.UP), _track_point(offset) + Vector3.UP * height)
+	var b := Basis.looking_at(-dir, Vector3.UP)
+	return Transform3D(b, _track_point(offset) + b.y * height)
+
+
+func _track_closest_point(x: float, z: float) -> Vector3:
+	var pt := curve.get_closest_point(Vector3(x, 0.0, z))
+	return curve.get_closest_point(Vector3(x, pt.y, z))
 
 
 func _distance_to_track(x: float, z: float) -> float:
-	var closest := curve.get_closest_point(Vector3(x, 0.0, z))
+	var closest := _track_closest_point(x, z)
 	return Vector2(closest.x - x, closest.z - z).length()
 
 
-## Ground is flat near the road, rolls into hills further out,
+## Ground is smoothly blended to road height near the road, rolls into hills further out,
 ## and rises into a ring of mountains at the edge of the map.
 func _terrain_height(x: float, z: float) -> float:
-	var d := _distance_to_track(x, z)
-	var hills := (noise.get_noise_2d(x, z) * 0.5 + 0.5) * 70.0 * smoothstep(25.0, 170.0, d)
+	var margin := 75.0
+	var hills := (noise.get_noise_2d(x, z) * 0.5 + 0.5) * 65.0
 	var edge := maxf(absf(x), absf(z))
 	var ridge := noise.get_noise_2d(x * 2.0 + 500.0, z * 2.0) * 0.5 + 0.5
-	var mountains := smoothstep(420.0, 720.0, edge) * 150.0 * (0.6 + 0.4 * ridge)
-	return hills + mountains
+	var mountains := smoothstep(440.0, 720.0, edge) * 160.0 * (0.6 + 0.4 * ridge)
+	var far_h := hills + mountains
+
+	# Fast rejection for terrain vertices outside track bounding envelope
+	if x < _track_bounds_min.x - margin or x > _track_bounds_max.x + margin or z < _track_bounds_min.y - margin or z > _track_bounds_max.y + margin:
+		return far_h
+
+	var closest := _track_closest_point(x, z)
+	var d := Vector2(closest.x - x, closest.z - z).length()
+	var road_h := closest.y
+	var blend := smoothstep(ROAD_HALF_WIDTH + 2.5, 65.0, d)
+	var local_terrain := road_h + hills * 0.8
+	return lerpf(road_h, lerpf(local_terrain, far_h, smoothstep(65.0, 200.0, d)), blend)
 
 
 # --- World building ------------------------------------------------------
@@ -637,7 +726,7 @@ func _build_terrain() -> void:
 	var instance := MeshInstance3D.new()
 	instance.mesh = mesh
 	instance.material_override = material
-	add_child(instance)
+	_track_root.add_child(instance)
 
 	var body := StaticBody3D.new()
 	body.name = "Terrain"
@@ -646,7 +735,7 @@ func _build_terrain() -> void:
 	trimesh.backface_collision = true
 	shape.shape = trimesh
 	body.add_child(shape)
-	add_child(body)
+	_track_root.add_child(body)
 
 
 func _build_road() -> void:
@@ -690,7 +779,7 @@ func _add_track_strip(polygon: PackedVector2Array, material: Material) -> CSGPol
 	strip.path_rotation = CSGPolygon3D.PATH_ROTATION_PATH_FOLLOW
 	strip.smooth_faces = true
 	strip.material = material
-	add_child(strip)
+	_track_root.add_child(strip)
 	strip.path_node = strip.get_path_to(track_path)
 	return strip
 
@@ -706,7 +795,7 @@ func _build_start_line() -> void:
 	var line := MeshInstance3D.new()
 	line.mesh = plane
 	line.transform = line_xform
-	add_child(line)
+	_track_root.add_child(line)
 
 	var metal := StandardMaterial3D.new()
 	metal.albedo_color = Color(0.25, 0.26, 0.28)
@@ -814,31 +903,34 @@ func _build_guardrails(corners: Array[Vector3]) -> void:
 			if _distance_to_track(a.x, a.z) > GUARDRAIL_OFFSET - 1.0:
 				_add_strip(rails, o, next, lateral, lateral, 0.85, 0.85, Color.WHITE, 0.4)
 				if fmod(o, 4.0) < 2.0:
-					posts.append(Transform3D(p0.basis, a + p0.basis.x * signf(lateral) * 0.15 + Vector3.UP * 0.45))
+					posts.append(Transform3D(p0.basis, a + p0.basis.x * signf(lateral) * 0.15 + p0.basis.y * 0.45))
 			o = next
 	var rail_mesh := _add_mesh(rails, steel)
 
-	var body := StaticBody3D.new()
-	body.name = "Guardrail"
-	var shape := CollisionShape3D.new()
-	var trimesh := rail_mesh.create_trimesh_shape() as ConcavePolygonShape3D
-	trimesh.backface_collision = true
-	shape.shape = trimesh
-	body.add_child(shape)
-	add_child(body)
+	if rail_mesh.get_surface_count() > 0:
+		var body := StaticBody3D.new()
+		body.name = "Guardrail"
+		var shape := CollisionShape3D.new()
+		var trimesh := rail_mesh.create_trimesh_shape() as ConcavePolygonShape3D
+		if trimesh:
+			trimesh.backface_collision = true
+			shape.shape = trimesh
+			body.add_child(shape)
+			_track_root.add_child(body)
 
-	var post_mesh := BoxMesh.new()
-	post_mesh.size = Vector3(0.12, 0.9, 0.12)
-	post_mesh.material = steel
-	var multimesh := MultiMesh.new()
-	multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	multimesh.mesh = post_mesh
-	multimesh.instance_count = posts.size()
-	for i in posts.size():
-		multimesh.set_instance_transform(i, posts[i])
-	var instance := MultiMeshInstance3D.new()
-	instance.multimesh = multimesh
-	add_child(instance)
+	if not posts.is_empty():
+		var post_mesh := BoxMesh.new()
+		post_mesh.size = Vector3(0.12, 0.9, 0.12)
+		post_mesh.material = steel
+		var multimesh := MultiMesh.new()
+		multimesh.transform_format = MultiMesh.TRANSFORM_3D
+		multimesh.mesh = post_mesh
+		multimesh.instance_count = posts.size()
+		for i in posts.size():
+			multimesh.set_instance_transform(i, posts[i])
+		var instance := MultiMeshInstance3D.new()
+		instance.multimesh = multimesh
+		_track_root.add_child(instance)
 
 
 ## Adds a ribbon that follows the track between two offsets. With drop > 0 it is a
@@ -852,11 +944,11 @@ func _add_strip(st: SurfaceTool, from: float, to: float, a: float, b: float, hei
 		var t1 := _track_transform(next, 0.0)
 		var quad: Array[Vector3]
 		if drop > 0.0:
-			quad = [t0.origin + t0.basis.x * a + Vector3.UP * (height_a - drop), t1.origin + t1.basis.x * a + Vector3.UP * (height_a - drop),
-				t1.origin + t1.basis.x * a + Vector3.UP * height_a, t0.origin + t0.basis.x * a + Vector3.UP * height_a]
+			quad = [t0.origin + t0.basis.x * a + t0.basis.y * (height_a - drop), t1.origin + t1.basis.x * a + t1.basis.y * (height_a - drop),
+				t1.origin + t1.basis.x * a + t1.basis.y * height_a, t0.origin + t0.basis.x * a + t0.basis.y * height_a]
 		else:
-			quad = [t0.origin + t0.basis.x * a + Vector3.UP * height_a, t1.origin + t1.basis.x * a + Vector3.UP * height_a,
-				t1.origin + t1.basis.x * b + Vector3.UP * height_b, t0.origin + t0.basis.x * b + Vector3.UP * height_b]
+			quad = [t0.origin + t0.basis.x * a + t0.basis.y * height_a, t1.origin + t1.basis.x * a + t1.basis.y * height_a,
+				t1.origin + t1.basis.x * b + t1.basis.y * height_b, t0.origin + t0.basis.x * b + t0.basis.y * height_b]
 		var normal := (quad[1] - quad[0]).cross(quad[3] - quad[0]).normalized()
 		var order := [0, 1, 2, 0, 2, 3]
 		# Godot treats clockwise triangles as front faces, so make surfaces wind clockwise seen from above.
@@ -877,7 +969,7 @@ func _add_mesh(st: SurfaceTool, material: Material) -> ArrayMesh:
 	var mesh := st.commit()
 	var instance := MeshInstance3D.new()
 	instance.mesh = mesh
-	add_child(instance)
+	_track_root.add_child(instance)
 	return mesh
 
 
@@ -888,7 +980,7 @@ func _add_prop(size: Vector3, pos: Vector3, rot: Basis, material: Material) -> v
 	var instance := MeshInstance3D.new()
 	instance.mesh = mesh
 	instance.transform = Transform3D(rot, pos)
-	add_child(instance)
+	_track_root.add_child(instance)
 	var body := StaticBody3D.new()
 	body.name = "Prop"
 	var shape := CollisionShape3D.new()
@@ -897,7 +989,7 @@ func _add_prop(size: Vector3, pos: Vector3, rot: Basis, material: Material) -> v
 	shape.shape = box
 	body.add_child(shape)
 	body.transform = instance.transform
-	add_child(body)
+	_track_root.add_child(body)
 
 
 func _build_checkpoints() -> void:
@@ -911,7 +1003,7 @@ func _build_checkpoints() -> void:
 		area.add_child(shape)
 		area.transform = _track_transform(track_length * i / CHECKPOINT_COUNT, 3.0)
 		area.body_entered.connect(_on_checkpoint_entered.bind(i))
-		add_child(area)
+		_track_root.add_child(area)
 
 
 func _build_trees() -> void:
@@ -961,7 +1053,7 @@ func _build_trees() -> void:
 			shape.shape = cylinder
 			body.add_child(shape)
 			body.position = base + Vector3.UP * 3.0 * s
-			add_child(body)
+			_track_root.add_child(body)
 
 	# Split the forest into patches with their own bounds, so the camera and each shadow
 	# cascade only draw the trees near them.
@@ -994,7 +1086,7 @@ func _build_trees() -> void:
 		# The cards turn to face the camera in the shader, so pad the bounds by a tree's size.
 		var pad := Vector3(TREE_QUAD_SIZE.x, 0.0, TREE_QUAD_SIZE.x)
 		instance.custom_aabb = AABB(low - pad, high - low + pad * 2.0 + Vector3.UP * TREE_QUAD_SIZE.y * 1.2)
-		add_child(instance)
+		_track_root.add_child(instance)
 		tree_instances.append(instance)
 
 
@@ -1033,7 +1125,7 @@ func _build_grass() -> void:
 		instance.multimesh = multimesh
 		instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		instance.visibility_range_end = 90.0
-		add_child(instance)
+		_track_root.add_child(instance)
 		grass_instances.append(instance)
 
 
@@ -1087,7 +1179,7 @@ func _build_rocks() -> void:
 		rock.mesh = mesh
 		rock.transform = xform.scaled_local(Vector3.ONE * s)
 		rock.visibility_range_end = 300.0
-		add_child(rock)
+		_track_root.add_child(rock)
 		placed += 1
 		if d < clearance + 25.0:
 			if not collision_points.has(mesh):
@@ -1104,7 +1196,7 @@ func _build_rocks() -> void:
 			collider.shape = shape
 			body.add_child(collider)
 			body.transform = xform
-			add_child(body)
+			_track_root.add_child(body)
 
 
 func _spawn_car() -> void:
@@ -1259,6 +1351,60 @@ func _reset_car() -> void:
 	(car as CarScript).reset_to(_track_transform(offset, 0.8))
 
 
+func load_track(index: int) -> void:
+	current_track_index = posmod(index, TRACK_DATA.size())
+	tree_instances.clear()
+	grass_instances.clear()
+
+	if _track_root and is_instance_valid(_track_root):
+		_track_root.name = "TrackRoot_Disposed"
+		_track_root.queue_free()
+
+	_track_root = Node3D.new()
+	_track_root.name = "TrackRoot"
+	add_child(_track_root)
+
+	_build_track_curve()
+	_build_terrain()
+	_build_road()
+	_build_start_line()
+	_build_road_details()
+	_build_checkpoints()
+	_build_trees()
+	_build_grass()
+	_build_rocks()
+
+	apply_quality(current_quality_level)
+
+	if minimap_ctrl:
+		minimap_ctrl.setup(curve.get_baked_points(), car, Vector2(230.0, 230.0))
+
+	_reset_race()
+	_show_message(TRACK_DATA[current_track_index].name, 3.5)
+
+
+func _reset_race() -> void:
+	countdown = COUNTDOWN
+	race_time = 0.0
+	player_finish_time = 0.0
+	finish_order.clear()
+	laps_done = 0
+	lap_running = false
+	lap_time = 0.0
+	last_lap = INF
+	best_lap = INF
+	next_checkpoint = 0
+	flipped_time = 0.0
+	for i in cars.size():
+		var racer := cars[i]
+		var slot: Vector2 = GRID[i]
+		var spot := _track_transform(-slot.x, 0.8)
+		(racer as CarScript).reset_to(spot.translated(spot.basis.x * slot.y))
+		progress[racer] = -slot.x
+		_last_offset[racer] = fposmod(-slot.x, track_length)
+		racer.frozen = true
+
+
 # --- Laps ----------------------------------------------------------------
 
 func _on_checkpoint_entered(body: Node3D, index: int) -> void:
@@ -1363,7 +1509,7 @@ func _build_hud() -> void:
 	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	var help := _make_label(layer, 15)
-	help.text = "W/S or arrows: drive and brake    A/D: steer    Space: handbrake    R: reset    C: camera    B: look back    H: headlights    V: photo mode    F: fps    Esc: menu"
+	help.text = "W/S: drive    A/D: steer    Space: handbrake    R: reset    T: next track    C: camera    B: look back    H: headlights    V: photo mode    F: fps    Esc: menu"
 	help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	help.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	help.offset_left = 28.0
@@ -1372,6 +1518,7 @@ func _build_hud() -> void:
 
 	var minimap := MinimapScript.new() as Control
 	layer.add_child(minimap)
+	minimap_ctrl = minimap
 	minimap.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	minimap.offset_left = -254.0
 	minimap.offset_right = -24.0
