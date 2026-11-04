@@ -6,8 +6,42 @@ extends VehicleBody3D
 const CarModel := preload("res://models/car_concept.glb")
 const CentenarioModel := preload("res://models/lamborghini_centenario/centenario.tscn")
 const TireEffects := preload("res://tire_effects.gd")
-const EngineLoop := preload("res://sounds/engine_loop.wav")
 const ExhaustScript := preload("res://exhaust.gd")
+
+# Real Open-Source Audio Pack (Multi-RPM Engine Loops, Decel, Limiter, Tires, Transmission, Turbo, Impacts)
+const EngineLoops: Array[AudioStreamWAV] = [
+	preload("res://sounds/engine_loop_0.wav"),
+	preload("res://sounds/engine_loop_1.wav"),
+	preload("res://sounds/engine_loop_2.wav"),
+	preload("res://sounds/engine_loop_3.wav"),
+	preload("res://sounds/engine_loop_4.wav"),
+	preload("res://sounds/engine_loop_5.wav"),
+]
+const LOOP_RPMS := [1000.0, 2000.0, 3200.0, 4600.0, 5900.0, 7200.0]
+const EngineDecel := preload("res://sounds/engine_decel.wav")
+const EngineLimiter := preload("res://sounds/engine_limiter.wav")
+const TireScreech := preload("res://sounds/tire_screech.wav")
+const TireScrub := preload("res://sounds/tire_scrub.wav")
+const GearWhine := preload("res://sounds/gear_whine.wav")
+const GearShiftUp := preload("res://sounds/gear_shift_up.wav")
+const GearShiftDown := preload("res://sounds/gear_shift_down.wav")
+const TurboBOV := preload("res://sounds/turbo_bov.wav")
+const TurboWhistle := preload("res://sounds/turbo_whistle.wav")
+const ImpactHeavy := preload("res://sounds/impact_heavy.wav")
+const ImpactThud := preload("res://sounds/impact_thud.wav")
+const ImpactClink := preload("res://sounds/impact_clink.wav")
+
+const BackfireSounds: Array[AudioStreamWAV] = [
+	preload("res://sounds/backfire_1.wav"),
+	preload("res://sounds/backfire_2.wav"),
+	preload("res://sounds/backfire_3.wav"),
+	preload("res://sounds/backfire_4.wav"),
+	preload("res://sounds/backfire_5.wav"),
+	preload("res://sounds/backfire_6.wav"),
+	preload("res://sounds/backfire_7.wav"),
+	preload("res://sounds/backfire_8.wav"),
+	preload("res://sounds/backfire_9.wav"),
+]
 
 const ENGINE_POWER := 180000.0 # watts, about 240 hp
 const MAX_DRIVE_FORCE := 3200.0 # per rear wheel; caps wheelspin off the line
@@ -205,34 +239,27 @@ var _steering_wheel: Node3D
 var _steering_wheel_basis: Basis
 var _skid := 0.0
 
-var _engine # AudioStreamPlayer for the player, AudioStreamPlayer3D for AI cars
-var _engine_rasp
+# Real Sample-Based Audio Players
+var _engine_players: Array[Node] = []
+var _engine_decel_player: Node
+var _engine_limiter_player: Node
+var _tire_screech_player: Node
+var _tire_scrub_player: Node
+var _gear_whine_player: Node
+var _turbo_whistle_player: Node
+var _shift_player: Node
+var _bov_player: Node
+var _backfire_player: Node
+var _impact_player: Node
+
 var _playback: AudioStreamGeneratorPlayback
 var _mix_rate := 44100.0
-
-# V12 Acoustic Firing & Induction Synthesis
-var _v12_phase := 0.0
-var _v12_sub_phase := 0.0
-
-# Transmission Dog-Gear Whine
-var _gear_whine_phase := 0.0
-
-# Granular Multi-Stage Tire Physics
-var _tire_scrub_noise := 0.0
-var _squeal_phase1 := 0.0
-var _squeal_phase2 := 0.0
-var _squeal_jitter := 0.0
-
-# Concussive Exhaust Backfires & Overrun Burbles
-var _pop_level := 0.0
-var _pop_boom_phase := 0.0
-var _overrun_burble_phase := 0.0
-var _overrun_level := 0.0
 
 # Aerodynamic Wind Buffeting & Stereo Air Rush
 var _wind_l := 0.0
 var _wind_r := 0.0
 var _buffet_phase := 0.0
+var _pop_level := 0.0
 
 # Rev Limiter Staccato Ignition Cut & Downshift Blip
 var _limiter_stutter := 0.0
@@ -288,7 +315,9 @@ func _ready() -> void:
 		var exhaust := ExhaustScript.new()
 		add_child(exhaust)
 		exhaust.setup(self, _layout.exhausts)
-		exhaust.on_pop = func(): _pop_level = 1.0
+		exhaust.on_pop = func():
+			_pop_level = 1.0
+			_trigger_backfire(randf_range(0.85, 1.0))
 		_build_sparks()
 	var effects := TireEffects.new()
 	add_child(effects)
@@ -437,21 +466,107 @@ func _process(_delta: float) -> void:
 
 
 func _update_engine_sound() -> void:
-	var rev := clampf((rpm - IDLE_RPM) / (REDLINE_RPM - IDLE_RPM), 0.0, 1.0)
-	var pitch := lerpf(ENGINE_PITCH_IDLE, ENGINE_PITCH_REDLINE, rev)
-	_engine.pitch_scale = pitch
-	_engine.volume_db = lerpf(-12.0, -2.5, maxf(throttle, rev * 0.5))
-	if _ignition_cut:
-		_engine.volume_db -= 8.0 # sudden torque/spark cut during limiter bounce
+	if _engine_players.is_empty():
+		return
 
-	# High-frequency exhaust rasp: pitches harmonically with revs and roars under throttle
-	_engine_rasp.pitch_scale = pitch * 1.5
-	_engine_rasp.volume_db = lerpf(-26.0, -5.0, throttle * rev)
-	if _ignition_cut:
-		_engine_rasp.volume_db -= 12.0
+	# 1. Multi-RPM Crossfade Engine Loops (Real Recorded Audio)
+	var n := LOOP_RPMS.size()
+	for i in n:
+		var center: float = LOOP_RPMS[i]
+		var w := 0.0
+		if i == 0 and rpm <= center:
+			w = 1.0
+		elif i == n - 1 and rpm >= center:
+			w = 1.0
+		elif i > 0 and rpm >= LOOP_RPMS[i - 1] and rpm <= center:
+			w = (rpm - LOOP_RPMS[i - 1]) / (center - LOOP_RPMS[i - 1])
+		elif i < n - 1 and rpm >= center and rpm <= LOOP_RPMS[i + 1]:
+			w = 1.0 - (rpm - center) / (LOOP_RPMS[i + 1] - center)
+
+		var player = _engine_players[i]
+		if w > 0.01:
+			var pitch: float = clampf(rpm / center, 0.68, 1.48)
+			player.pitch_scale = pitch
+			# Dynamic load scaling: full throttle roars louder and throatier
+			var base_vol: float = linear_to_db(w)
+			var throttle_boost: float = lerpf(-9.0, -1.0, throttle)
+			if _ignition_cut:
+				throttle_boost -= 12.0 # instantaneous torque cut
+			player.volume_db = base_vol + throttle_boost
+		else:
+			player.volume_db = -80.0
+
+	# 2. Real Off-Throttle Engine Deceleration Overrun
+	if _engine_decel_player:
+		if throttle < 0.22 and rpm > 2200.0 and speed_kmh > 15.0:
+			var decel_w := (1.0 - throttle * 4.5) * clampf((rpm - 2200.0) / 2800.0, 0.0, 1.0)
+			_engine_decel_player.pitch_scale = clampf(rpm / 4200.0, 0.65, 1.7)
+			_engine_decel_player.volume_db = linear_to_db(decel_w) - 3.5
+		else:
+			_engine_decel_player.volume_db = -80.0
+
+	# 3. Real Rev Limiter Bounce Cut
+	if _engine_limiter_player:
+		if _ignition_cut:
+			_engine_limiter_player.pitch_scale = randf_range(0.96, 1.04)
+			_engine_limiter_player.volume_db = -1.0
+		else:
+			_engine_limiter_player.volume_db = -80.0
+
+	if not is_player:
+		return
+
+	# 4. Real Recorded Tire Screech (96 kHz Asphalt Slide)
+	if _tire_screech_player:
+		var squeal_norm := clampf((_skid - 0.26) * 2.8, 0.0, 1.0) * clampf(speed_kmh / 12.0, 0.0, 1.0)
+		if burnout:
+			squeal_norm = 1.0
+		if squeal_norm > 0.01:
+			_tire_screech_player.pitch_scale = clampf(0.90 + speed_kmh / 160.0 * 0.28 + _skid * 0.12, 0.85, 1.38)
+			_tire_screech_player.volume_db = linear_to_db(squeal_norm) - 1.5
+		else:
+			_tire_screech_player.volume_db = -80.0
+
+	# 5. Real Recorded Asphalt Scrub (Edge-of-Grip Friction)
+	if _tire_scrub_player:
+		var scrub_norm := 0.0
+		if _skid > 0.08 and _skid < 0.42 and speed_kmh > 12.0:
+			scrub_norm = clampf((_skid - 0.08) * 4.5, 0.0, 1.0) * clampf((0.42 - _skid) * 4.0, 0.0, 1.0)
+		if scrub_norm > 0.01:
+			_tire_scrub_player.pitch_scale = clampf(0.85 + speed_kmh / 120.0 * 0.35, 0.75, 1.45)
+			_tire_scrub_player.volume_db = linear_to_db(scrub_norm) - 4.5
+		else:
+			_tire_scrub_player.volume_db = -80.0
+
+	# 6. Real Recorded Straight-Cut Dog Gear Transmission Whine
+	if _gear_whine_player:
+		if speed_kmh > 4.0:
+			var whine_norm := clampf(speed_kmh / 170.0, 0.0, 1.0) * lerpf(0.18, 0.95, throttle)
+			_gear_whine_player.pitch_scale = clampf(speed_kmh / 80.0, 0.32, 2.7)
+			_gear_whine_player.volume_db = linear_to_db(whine_norm) - 7.5
+		else:
+			_gear_whine_player.volume_db = -80.0
+
+	# 7. Real Turbo Compressor Spool Whistle
+	var target_boost := clampf((rpm - 2400.0) / 4200.0, 0.0, 1.0) * throttle
+	_turbo_boost = move_toward(_turbo_boost, target_boost, 0.04)
+	if throttle < 0.18 and _prev_throttle > 0.55 and _turbo_boost > 0.32:
+		if _bov_player:
+			_bov_player.stream = TurboBOV
+			_bov_player.pitch_scale = randf_range(0.96, 1.05)
+			_bov_player.volume_db = lerpf(-4.0, 2.0, _turbo_boost)
+			_bov_player.play()
+	_prev_throttle = throttle
+
+	if _turbo_whistle_player:
+		if _turbo_boost > 0.04:
+			_turbo_whistle_player.pitch_scale = 0.72 + _turbo_boost * 0.85
+			_turbo_whistle_player.volume_db = linear_to_db(_turbo_boost * _turbo_boost) - 6.5
+		else:
+			_turbo_whistle_player.volume_db = -80.0
 
 
-## Procedural synthesis for tire squeal, wind, backfires, turbo spool, blow-off valve, curb rumble, and scrape.
+## Procedural synthesis for high-speed wind buffeting, curb rumble clatter, and metal scrape.
 func _fill_effects_sound() -> void:
 	if _playback == null:
 		return
@@ -459,51 +574,18 @@ func _fill_effects_sound() -> void:
 	if frames <= 0:
 		return
 
-	var rev := clampf((rpm - IDLE_RPM) / (REDLINE_RPM - IDLE_RPM), 0.0, 1.0)
-
-	# 1. Granular Tire Physics (Pre-skid scrub + dual-frequency sliding screech)
-	var scrub_amount := clampf((_skid - 0.12) * 3.5, 0.0, 1.0) * clampf(speed_kmh / 15.0, 0.0, 1.0)
-	var squeal_amount := clampf((_skid - 0.35) * 2.2, 0.0, 1.0) * clampf(speed_kmh / 18.0, 0.0, 1.0)
-	if burnout:
-		squeal_amount = 1.0
-		scrub_amount = 1.0
-
-	# 2. Aerodynamic Wind & Atmospheric Buffeting
+	# Aerodynamic Wind & Cabin Pressure Buffeting
 	var wind_speed_norm := clampf(speed_kmh / 260.0, 0.0, 1.0)
-	var wind_level := wind_speed_norm * wind_speed_norm * 0.16
-	var buffet_level := clampf((speed_kmh - 130.0) / 130.0, 0.0, 1.0) * 0.055
+	var wind_level := wind_speed_norm * wind_speed_norm * 0.18
+	var buffet_level := clampf((speed_kmh - 130.0) / 130.0, 0.0, 1.0) * 0.065
 
-	# 3. Turbocharger Spool & BOV Flutter
-	var target_boost := clampf((rpm - 2400.0) / 4200.0, 0.0, 1.0) * throttle
-	_turbo_boost = move_toward(_turbo_boost, target_boost, 0.04)
-	if throttle < 0.2 and _prev_throttle > 0.6 and _turbo_boost > 0.3:
-		_bov_level = clampf(_turbo_boost * 1.25, 0.45, 1.0)
-		_bov_flutter = 0.0
-	_prev_throttle = throttle
-	var turbo_freq := lerpf(2000.0, 4400.0, _turbo_boost)
-
-	# 4. Transmission Straight-Cut Dog Gear Whine
-	var gear_freq := clampf(speed_kmh * 16.5, 80.0, 4200.0)
-	var gear_whine_level := clampf(speed_kmh / 180.0, 0.0, 1.0) * lerpf(0.12, 1.0, throttle) * 0.038
-
-	# 5. V12 Combustion Firing Frequency (6 pulses per rev)
-	var v12_f0 := clampf(rpm / 10.0, 80.0, 850.0)
-
-	# 6. Overrun Exhaust Burble
-	if throttle < 0.08 and rpm > 3200.0 and speed_kmh > 20.0:
-		_overrun_level = move_toward(_overrun_level, 0.75, 0.08)
-	else:
-		_overrun_level = move_toward(_overrun_level, 0.0, 0.04)
-
-	# 7. Curb Rumble Level
-	var rumble_level := 0.26 if on_curb and speed_kmh > 10.0 else 0.0
+	# Curb Rumble Level
+	var rumble_level := 0.28 if on_curb and speed_kmh > 10.0 else 0.0
 	var rumble_hz := clampf(speed_kmh * 1.2, 38.0, 92.0)
 
 	var inv_sr := 1.0 / _mix_rate
 
 	for i in frames:
-		_squeal_jitter += inv_sr * 8.0
-
 		# Wind Stereo Noise
 		_wind_l += (randf_range(-1.0, 1.0) - _wind_l) * 0.06
 		_wind_r += (randf_range(-1.0, 1.0) - _wind_r) * 0.06
@@ -516,80 +598,6 @@ func _fill_effects_sound() -> void:
 			var buff := sin(_buffet_phase * TAU) * buffet_level
 			out_l += buff
 			out_r += buff * 0.85
-
-		# V12 Physical Combustion & High-RPM Screaming Harmonics
-		_v12_phase = fmod(_v12_phase + v12_f0 * inv_sr, 1.0)
-		_v12_sub_phase = fmod(_v12_sub_phase + (v12_f0 * 0.5) * inv_sr, 1.0)
-		# Fundamental combustion pulse + 2nd + 3rd harmonic
-		var pulse := sin(_v12_phase * TAU) + 0.42 * sin(_v12_phase * 2.0 * TAU) + 0.22 * sin(_v12_phase * 3.0 * TAU)
-		# Italian V12 high-RPM metallic scream (4th + 6th order harmonics)
-		var scream := (sin(_v12_phase * 4.0 * TAU) * 0.45 + sin(_v12_phase * 6.0 * TAU) * 0.3) * (rev * rev)
-		# Sub-bass engine displacement thrum (50-100 Hz punch)
-		var sub_thrum := sin(_v12_sub_phase * TAU) * 0.14 * (1.0 - rev * 0.4)
-		var v12_synth := (pulse * 0.55 + scream * 0.65 + sub_thrum) * (0.045 + throttle * 0.075)
-		if _ignition_cut:
-			v12_synth *= 0.15 # cut spark during limiter bounce
-		out_l += v12_synth
-		out_r += v12_synth
-
-		# Transmission Straight-Cut Gear Whine (with stereo phase offset)
-		if gear_whine_level > 0.001:
-			_gear_whine_phase = fmod(_gear_whine_phase + gear_freq * inv_sr, 1.0)
-			var whine_base := sin(_gear_whine_phase * TAU) + 0.28 * sin(_gear_whine_phase * 2.0 * TAU)
-			var whine_r := sin((_gear_whine_phase + 0.08) * TAU) + 0.28 * sin((_gear_whine_phase + 0.08) * 2.0 * TAU)
-			out_l += whine_base * gear_whine_level
-			out_r += whine_r * gear_whine_level
-
-		# Tire Scrub (edge-of-grip asphalt tearing)
-		if scrub_amount > 0.01:
-			_tire_scrub_noise += (randf_range(-1.0, 1.0) - _tire_scrub_noise) * 0.3
-			var scrub_sound := _tire_scrub_noise * scrub_amount * 0.045
-			out_l += scrub_sound
-			out_r += scrub_sound
-
-		# Tire Screech (chaotic dual-tone slide with rubber friction frequency modulation)
-		if squeal_amount > 0.01:
-			var j1 := sin(_squeal_jitter * 28.0) * 55.0
-			var j2 := cos(_squeal_jitter * 19.0) * 75.0
-			_squeal_phase1 = fmod(_squeal_phase1 + (760.0 + j1) * inv_sr, 1.0)
-			_squeal_phase2 = fmod(_squeal_phase2 + (1380.0 + j2) * inv_sr, 1.0)
-			var screech := (sin(_squeal_phase1 * TAU) * 0.65 + sin(_squeal_phase2 * TAU) * 0.35 + randf_range(-0.25, 0.25)) * squeal_amount * 0.085
-			out_l += screech
-			out_r += screech * 0.95
-
-		# Turbo Spool Whistle
-		if _turbo_boost > 0.05:
-			_turbo_phase = fmod(_turbo_phase + turbo_freq * inv_sr, 1.0)
-			var spool := (sin(_turbo_phase * TAU) + 0.25 * sin(_turbo_phase * 2.0 * TAU)) * _turbo_boost * _turbo_boost * 0.026
-			out_l += spool * 0.8
-			out_r += spool * 1.0 # slight right bias
-
-		# Blow-off Valve Flutter ("stututu-tu-tu")
-		if _bov_level > 0.005:
-			_bov_flutter += inv_sr
-			var mod := clampf(sin(_bov_flutter * TAU * 17.0) * 0.5 + 0.5, 0.1, 1.0)
-			var bov_chirp := sin(fmod(_bov_flutter * 2400.0 * exp(-_bov_flutter * 3.5), 1.0) * TAU) * 0.4 + randf_range(-0.6, 0.6)
-			var bov_out := bov_chirp * _bov_level * mod * 0.085
-			out_l += bov_out * 0.7
-			out_r += bov_out * 1.0
-			_bov_level *= 0.9997
-
-		# Overrun Exhaust Burbles & Gurgles
-		if _overrun_level > 0.01:
-			_overrun_burble_phase = fmod(_overrun_burble_phase + (v12_f0 * 0.35 + randf_range(-15.0, 15.0)) * inv_sr, 1.0)
-			var burble := (sin(_overrun_burble_phase * TAU) + randf_range(-0.35, 0.35)) * _overrun_level * 0.038
-			out_l += burble
-			out_r += burble * 1.1
-
-		# Concussive Exhaust Backfires (Impulse Crack + Sub-Bass Boom)
-		if _pop_level > 0.001:
-			_pop_boom_phase = fmod(_pop_boom_phase + 105.0 * inv_sr, 1.0)
-			var boom := sin(_pop_boom_phase * TAU) * _pop_level * 0.38
-			var crack := randf_range(-1.0, 1.0) * _pop_level * 0.52
-			var pop_out := boom + crack
-			out_l += pop_out * 0.9
-			out_r += pop_out * 1.1
-			_pop_level *= 0.9984
 
 		# Curb Rumble / Kerb Clatter
 		if rumble_level > 0.0:
@@ -660,7 +668,7 @@ func _update_rpm(abs_speed: float, delta: float) -> void:
 			_ignition_cut = true
 			target -= 280.0
 			if randf() < 0.35:
-				_pop_level = 0.85
+				_trigger_backfire(randf_range(0.75, 1.0))
 		else:
 			_ignition_cut = false
 	else:
@@ -670,11 +678,22 @@ func _update_rpm(abs_speed: float, delta: float) -> void:
 	# Downshift rev-matching throttle blip & upshift pop
 	if gear < prev_gear and not frozen:
 		_downshift_blip = 1.0
-		if is_player and randf() < 0.65:
-			_pop_level = maxf(_pop_level, 0.75)
-	elif gear > prev_gear and throttle > 0.5 and not frozen:
 		if is_player:
-			_pop_level = maxf(_pop_level, 0.95)
+			if _shift_player:
+				_shift_player.stream = GearShiftDown
+				_shift_player.pitch_scale = randf_range(0.96, 1.04)
+				_shift_player.volume_db = -1.0
+				_shift_player.play()
+			if randf() < 0.7:
+				_trigger_backfire(randf_range(0.7, 0.95))
+	elif gear > prev_gear and throttle > 0.4 and not frozen:
+		if is_player:
+			if _shift_player:
+				_shift_player.stream = GearShiftUp
+				_shift_player.pitch_scale = randf_range(0.96, 1.04)
+				_shift_player.volume_db = -1.0
+				_shift_player.play()
+			_trigger_backfire(randf_range(0.85, 1.0))
 
 	if _downshift_blip > 0.0:
 		target += _downshift_blip * 950.0
@@ -946,20 +965,78 @@ func _build_headlights() -> void:
 
 
 func _build_engine_sound() -> void:
-	var loop := EngineLoop.duplicate() as AudioStreamWAV
-	loop.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	loop.loop_begin = 0
-	loop.loop_end = int(loop.get_length() * loop.mix_rate)
-	_engine = _add_audio_player(loop)
-	_engine_rasp = _add_audio_player(loop)
+	# 1. Multi-RPM Crossfade Engine Loops (Real Recorded Audio)
+	for i in EngineLoops.size():
+		var loop := _make_loop(EngineLoops[i])
+		var player := _add_audio_player(loop)
+		player.volume_db = -80.0
+		_engine_players.append(player)
+
+	# 2. Deceleration Overrun Rumble & Limiter Cut
+	_engine_decel_player = _add_audio_player(_make_loop(EngineDecel))
+	_engine_decel_player.volume_db = -80.0
+	_engine_limiter_player = _add_audio_player(_make_loop(EngineLimiter))
+	_engine_limiter_player.volume_db = -80.0
+
 	if not is_player:
 		return
 
+	# 3. Real Tire Screech & Asphalt Scrub
+	_tire_screech_player = _add_audio_player(_make_loop(TireScreech))
+	_tire_screech_player.volume_db = -80.0
+	_tire_scrub_player = _add_audio_player(_make_loop(TireScrub))
+	_tire_scrub_player.volume_db = -80.0
+
+	# 4. Straight-Cut Transmission Gear Whine & Turbo Whistle
+	_gear_whine_player = _add_audio_player(_make_loop(GearWhine))
+	_gear_whine_player.volume_db = -80.0
+	_turbo_whistle_player = _add_audio_player(_make_loop(TurboWhistle))
+	_turbo_whistle_player.volume_db = -80.0
+
+	# 5. One-Shot Effect Players (Shifts, BOV flutter, Backfires, Impacts)
+	_shift_player = _add_one_shot_player()
+	_bov_player = _add_one_shot_player()
+	_backfire_player = _add_one_shot_player()
+	_impact_player = _add_one_shot_player()
+
+	# 6. Procedural Generator for High-Speed Stereo Wind & Curb Clatter
 	var generator := AudioStreamGenerator.new()
 	generator.mix_rate = _mix_rate
 	generator.buffer_length = 0.1
 	var effects := _add_audio_player(generator)
 	_playback = effects.get_stream_playback() as AudioStreamGeneratorPlayback
+
+
+func _make_loop(stream: AudioStreamWAV) -> AudioStreamWAV:
+	var loop := stream.duplicate() as AudioStreamWAV
+	loop.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	loop.loop_begin = 0
+	loop.loop_end = int(loop.get_length() * loop.mix_rate)
+	return loop
+
+
+func _add_one_shot_player() -> Node:
+	var player: Node
+	if is_player:
+		player = AudioStreamPlayer.new()
+	else:
+		var positional := AudioStreamPlayer3D.new()
+		positional.unit_size = 8.0
+		positional.max_distance = 180.0
+		player = positional
+	add_child(player)
+	return player
+
+
+func _trigger_backfire(volume_scale: float = 1.0) -> void:
+	if not is_player or _backfire_player == null or BackfireSounds.is_empty():
+		return
+	var sample: AudioStreamWAV = BackfireSounds[randi() % BackfireSounds.size()]
+	_backfire_player.stream = sample
+	_backfire_player.pitch_scale = randf_range(0.90, 1.12)
+	_backfire_player.volume_db = lerpf(-9.0, 2.0, clampf(volume_scale, 0.0, 1.0))
+	_backfire_player.play()
+	_pop_level = volume_scale
 
 
 ## The player hears their own car flat; AI cars are positioned in 3D so you hear them pass.
@@ -1021,10 +1098,22 @@ func _on_body_entered(body: Node) -> void:
 	if not _is_obstacle(body):
 		return
 	var impact := linear_velocity.length()
-	if impact > 2.5:
+	if impact > 2.0:
 		_scrape_level = clampf(impact / 18.0, 0.35, 1.0)
 		if is_player:
 			collision_impact.emit(impact)
+			if _impact_player:
+				if impact > 10.5:
+					_impact_player.stream = ImpactHeavy
+					_impact_player.volume_db = 1.0
+				elif impact > 5.0:
+					_impact_player.stream = ImpactThud
+					_impact_player.volume_db = lerpf(-4.0, 0.0, (impact - 5.0) / 5.5)
+				else:
+					_impact_player.stream = ImpactClink
+					_impact_player.volume_db = -5.0
+				_impact_player.pitch_scale = randf_range(0.92, 1.08)
+				_impact_player.play()
 			if _spark_emitter:
 				_spark_emitter.position = Vector3(randf_range(-0.8, 0.8), 0.4, randf_range(-1.2, 1.2))
 				_spark_emitter.restart()

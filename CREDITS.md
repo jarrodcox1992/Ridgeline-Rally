@@ -48,9 +48,19 @@ All from [Poly Haven](https://polyhaven.com/textures), CC0 (public domain):
 
 "Rock Moss Set 01" and "Boulder 01" from [Poly Haven](https://polyhaven.com/models), CC0 (public domain).
 
-## Engine sound
+## Audio & Sound Effects
 
-"Racing car engine sound loops" by domasx2, from [OpenGameArt](https://opengameart.org/content/racing-car-engine-sound-loops), CC0 (public domain). The game uses `loop_0.wav` and pitches it to the engine's RPM.
+- **Engine Loops (Multi-RPM Crossfading):** "Racing car engine sound loops" by domasx2, from [OpenGameArt](https://opengameart.org/content/racing-car-engine-sound-loops), CC0 (public domain). Features 6 distinct loops (`engine_loop_0.wav` through `engine_loop_5.wav`) seamlessly crossfaded across 900 to 7,200+ RPM.
+- **Tire Screech:** "Car tire squeal skid loop" by audible-edge and qubodup, from [OpenGameArt](https://opengameart.org/content/car-tire-squeal-skid-loop), licensed under [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/). Studio-recorded 96 kHz tire squeal on road asphalt.
+- **Tire Scrub, Gear Whine, Overrun Decel, Limiter Cut, Shifts, BOV & Backfires:** Extracted from the open-source vehicle audio library [bungee-engine-audio](https://github.com/LeonManiora/bungee-engine-audio) by Leon Maniora, licensed under the [MIT License](https://github.com/LeonManiora/bungee-engine-audio/blob/main/addons/bungee/LICENSE.txt):
+  - `tire_scrub.wav`: Asphalt grain friction scrub sound
+  - `gear_whine.wav`: Straight-cut dog-gear transmission whine
+  - `engine_decel.wav`: Off-throttle overrun engine braking rumble
+  - `engine_limiter.wav`: Hard rev limiter bounce ignition cut
+  - `gear_shift_up.wav` & `gear_shift_down.wav`: Sequential dog-box mechanical shifter clunk
+  - `turbo_bov.wav` & `turbo_whistle.wav`: Blow-off valve compressor flutter and spool whistle
+  - `backfire_1.wav` through `backfire_9.wav`: 9 distinct recorded exhaust backfires and pop variations
+- **Metal Impact & Collision Sounds:** "Metal Impact Sounds" by Brian MacIntosh (BMacZero), from [OpenGameArt](https://opengameart.org/content/metal-impact-sounds), CC0 (public domain). Includes heavy chassis crashes (`impact_heavy.wav`), guardrail thuds (`impact_thud.wav`), and debris clinks (`impact_clink.wav`).
 
 ## Everything else
 
