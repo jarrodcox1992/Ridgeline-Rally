@@ -59,3 +59,14 @@ Found by driving the race through scripted runs, then fixed:
 - Finishing needs three laps confirmed by the checkpoints, not distance alone, so a cut course can't end the race. Missing a checkpoint now says so on the HUD.
 - The lap timer stops when you finish and the HUD switches to your race time, instead of counting up behind "Finished P3".
 - Photo mode silences the engine like the pause menu does, resets its hint after a save, and reports a failed screenshot.
+
+## Immersion & Polish Pass
+
+- **Collision Sparks & Metal Scrape**: Real-time particle sparks and dynamic metal grind audio when scraping guardrails or colliding with opponents.
+- **Curb Rumble & Camera Shaking**: High-frequency physical thumping sound and camera vibration when clipping red-and-white corner rumble strips at speed.
+- **Turbo Spool & Blow-Off Valve (BOV)**: Procedural high-pitch turbo compressor whistle spooling under heavy throttle above 2600 rpm, paired with signature compressor flutter ("stututu") upon sudden throttle lift-off.
+- **Dynamic Speed FOV**: Camera dynamically widens field of view as speed increases to sell the sensation of speed.
+- **F1-Style Shift Light Bar**: 9-LED cluster positioned directly above the digital speedometer (3 green, 3 amber, 2 red, 1 blue) that fills sequentially as RPM builds and flashes the full bar at 6850+ RPM redline.
+- **Night Mode with Starry Sky & Dynamic Headlights**: CC0 Qwantani night sky with moon illumination, deep blue fog, and real shadow-casting dual headlights on the player car with automatic night activation for AI opponents.
+- **Refined Custom Car Mesh**: Elliptical wheel cutout pass restoring 840+ triangles along the front fender arch for smooth, seamless bodywork.
+
