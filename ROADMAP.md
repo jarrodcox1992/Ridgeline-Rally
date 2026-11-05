@@ -93,3 +93,8 @@ Found by driving the race through scripted runs, then fixed:
   - In-game dispatch via `K` key / gamepad `X`.
 
 
+
+## Known issues
+
+- **Track 4 (Sector-9 Autobahn A-95) is not drivable end to end.** The autopilot stalls at the start: the elevated loop crosses over the start straight with its road slab about 1.55 m above the ground, lower than the car's roof. Raising that crossing clears the start but exposes a second stall on the elevated section near 4100 m. Fix by redesigning the track's elevation (move the crossing off the start straight, or lower the loop there). Track 0 (Neo-Veridia) completes a lap.
+- Intermittent autopilot stalls on track 0 when the car runs wide onto a sidewalk prop; the drive test's stall recovery resets the car and continues.
