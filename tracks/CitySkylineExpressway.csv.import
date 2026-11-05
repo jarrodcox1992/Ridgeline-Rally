@@ -1,0 +1,16 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dutqyai3hmh5s"
+
+[deps]
+
+source_file="res://tracks/CitySkylineExpressway.csv"
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

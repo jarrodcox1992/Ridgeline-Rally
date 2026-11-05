@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://c3fgwls5c6ivd"
+
+[deps]
+
+files=["res://tracks/BrandsHatch.y.translation", "res://tracks/BrandsHatch.w.translation", "res://tracks/BrandsHatch.w.translation"]
+
+source_file="res://tracks/BrandsHatch.csv"
+dest_files=["res://tracks/BrandsHatch.y.translation", "res://tracks/BrandsHatch.w.translation", "res://tracks/BrandsHatch.w.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dtrml1gajukv7"
+
+[deps]
+
+files=["res://tracks/Spielberg.y.translation", "res://tracks/Spielberg.w.translation", "res://tracks/Spielberg.w.translation"]
+
+source_file="res://tracks/Spielberg.csv"
+dest_files=["res://tracks/Spielberg.y.translation", "res://tracks/Spielberg.w.translation", "res://tracks/Spielberg.w.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

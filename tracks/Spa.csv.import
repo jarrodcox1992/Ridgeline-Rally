@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://cviuve6t4ylq0"
+
+[deps]
+
+files=["res://tracks/Spa.y.translation", "res://tracks/Spa.w.translation", "res://tracks/Spa.w.translation"]
+
+source_file="res://tracks/Spa.csv"
+dest_files=["res://tracks/Spa.y.translation", "res://tracks/Spa.w.translation", "res://tracks/Spa.w.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

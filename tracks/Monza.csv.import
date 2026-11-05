@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bdv1sa0c355fo"
+
+[deps]
+
+files=["res://tracks/Monza.y.translation", "res://tracks/Monza.w.translation", "res://tracks/Monza.w.translation"]
+
+source_file="res://tracks/Monza.csv"
+dest_files=["res://tracks/Monza.y.translation", "res://tracks/Monza.w.translation", "res://tracks/Monza.w.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

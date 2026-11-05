@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://2mtkl827j2ub"
+
+[deps]
+
+files=["res://tracks/Nuerburgring.y.translation", "res://tracks/Nuerburgring.w.translation", "res://tracks/Nuerburgring.w.translation"]
+
+source_file="res://tracks/Nuerburgring.csv"
+dest_files=["res://tracks/Nuerburgring.y.translation", "res://tracks/Nuerburgring.w.translation", "res://tracks/Nuerburgring.w.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

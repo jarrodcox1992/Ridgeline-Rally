@@ -1,0 +1,15 @@
+GNU LESSER GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
+
+Copyright (C) 2018 Technical University of Munich, Chair of Automotive Technology (TUM-FTM)
+Repository: https://github.com/TUMFTM/racetrack-database
+
+Track centerlines, boundaries, and metric coordinate data are derived from OpenStreetMap (OSM).
+OpenStreetMap is open data, licensed under the Open Data Commons Open Database License (ODbL)
+by the OpenStreetMap Foundation (OSMF).
+© OpenStreetMap contributors (https://www.openstreetmap.org/copyright)
+
+This data is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU Lesser General Public License for more details:
+https://www.gnu.org/licenses/lgpl-3.0.en.html
