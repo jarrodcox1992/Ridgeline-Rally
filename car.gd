@@ -210,6 +210,8 @@ var rpm := IDLE_RPM
 var gear := 1
 var reversing := false
 var speed_kmh := 0.0
+## Dynamic road traction multiplier applied by RoadRepairController (0.1..1.0)
+var road_traction_multiplier: float = 1.0
 
 var _rear_wheels: Array[VehicleWheel3D] = []
 var _all_wheels: Array[VehicleWheel3D] = []
@@ -227,6 +229,19 @@ var _prev_throttle := 0.0
 var _rumble_phase := 0.0
 var _scrape_level := 0.0
 var _spark_emitter: GPUParticles3D
+var abs_enabled: bool = true
+var tcs_enabled: bool = true
+var abs_active: bool = false
+var tcs_active: bool = false
+var _abs_phase: float = 0.0
+var slipstream_factor: float = 0.0
+var g_force_lateral: float = 0.0
+var g_force_longitudinal: float = 0.0
+var _prev_velocity: Vector3 = Vector3.ZERO
+var _bottom_out_cooldown: float = 0.0
+var _bottom_out_player: Node
+var _brake_squeal_level: float = 0.0
+var _brake_squeal_phase: float = 0.0
 
 var _brake_light_material: StandardMaterial3D
 var _tail_glow: OmniLight3D
@@ -337,7 +352,7 @@ func _physics_process(delta: float) -> void:
 	var brake_input: float = ai_input.brake
 	var steer_input: float = ai_input.steer
 	var handbrake_on: bool = ai_input.handbrake
-	if is_player:
+	if is_player and InputMap.has_action("accelerate"):
 		accel_input = Input.get_action_strength("accelerate")
 		brake_input = Input.get_action_strength("brake")
 		steer_input = Input.get_axis("steer_right", "steer_left")
@@ -376,6 +391,19 @@ func _physics_process(delta: float) -> void:
 			decel = 0.0
 			throttle = brake_input
 			reversing = true
+
+	# Active Traction Control System (TCS)
+	tcs_active = false
+	if tcs_enabled and force > 250.0 and not burnout and speed < 130.0:
+		var slip_detected := false
+		for rw in _rear_wheels:
+			if rw.is_in_contact() and (1.0 - rw.get_skidinfo()) > 0.32:
+				slip_detected = true
+				break
+		if slip_detected:
+			tcs_active = true
+			force *= 0.62
+
 	var hold := force == 0.0 and speed < 1.0
 	if frozen:
 		force = 0.0
@@ -386,23 +414,39 @@ func _physics_process(delta: float) -> void:
 	engine_force = force
 	brake = HOLD_BRAKE * 4.0 if hold else 0.0
 
+	# Active Anti-Lock Braking System (ABS)
+	abs_active = false
+	if abs_enabled and decel > 4.0 and forward_speed > 3.0 and _skid > 0.24:
+		abs_active = true
+		_abs_phase = fmod(_abs_phase + delta * 18.0, 1.0)
+		decel *= (0.68 + 0.32 * sin(_abs_phase * TAU))
+
 	burnout = handbrake_on and accel_input > 0.5 and speed < 6.0
 	for wheel in _rear_wheels:
-		wheel.wheel_friction_slip = REAR_GRIP_HANDBRAKE if handbrake_on else REAR_GRIP
+		wheel.wheel_friction_slip = (REAR_GRIP_HANDBRAKE if handbrake_on else REAR_GRIP) * road_traction_multiplier
 		if burnout:
 			# Rears get full power on almost no grip, so they spin instead of driving the car.
-			wheel.wheel_friction_slip = 0.35
+			wheel.wheel_friction_slip = 0.35 * road_traction_multiplier
 			wheel.brake = 0.0
 			wheel.engine_force = MAX_DRIVE_FORCE
 		elif handbrake_on:
 			wheel.brake = HANDBRAKE
 			wheel.engine_force = 0.0
+	for wheel in _all_wheels:
+		if wheel.use_as_steering:
+			wheel.wheel_friction_slip = FRONT_GRIP * road_traction_multiplier
 	if burnout:
 		for wheel in _all_wheels:
 			if wheel.use_as_steering:
 				wheel.brake = 60.0
 		decel = 0.0
 		throttle = accel_input
+
+	# Acceleration & G-force Telemetry Calculation
+	var accel_vec := (linear_velocity - _prev_velocity) / maxf(delta, 0.001)
+	_prev_velocity = linear_velocity
+	g_force_lateral = global_basis.x.dot(accel_vec) / 9.80665
+	g_force_longitudinal = (-global_basis.z).dot(accel_vec) / 9.80665
 
 	var grounded := 0
 	for wheel in _all_wheels:
@@ -417,15 +461,43 @@ func _physics_process(delta: float) -> void:
 			apply_force(brake_push, global_basis * Vector3(0.0, 0.6, 0.0))
 		if speed > 0.5:
 			apply_central_force(-linear_velocity.normalized() * ROLLING_RESISTANCE * mass * 9.8 * share)
-	apply_central_force(-linear_velocity * speed * DRAG)
-	apply_central_force(-global_basis.y * speed * speed * DOWNFORCE)
+
+	# Dynamic Split Aerodynamics & Slipstream Drafting
+	var speed_sq := speed * speed
+	var drag_effective := DRAG * (1.0 - slipstream_factor * 0.40)
+	apply_central_force(-linear_velocity * speed * drag_effective)
+	if slipstream_factor > 0.05:
+		apply_central_force(global_basis.z * mass * 2.4 * slipstream_factor)
+
+	# Front Splitter and Rear Diffuser / Wing Split Downforce
+	var downforce_mult := 1.0 + clampf(speed_kmh / 240.0, 0.0, 0.55)
+	var df_front := -global_basis.y * speed_sq * DOWNFORCE * 0.46 * downforce_mult
+	var df_rear := -global_basis.y * speed_sq * DOWNFORCE * 0.54 * downforce_mult
+	apply_force(df_front, global_basis * Vector3(0.0, 0.12, WHEELBASE * 0.45))
+	apply_force(df_rear, global_basis * Vector3(0.0, 0.38, -WHEELBASE * 0.45))
+
+	# Suspension Bottom-Out Landing Detection
+	if _bottom_out_cooldown > 0.0:
+		_bottom_out_cooldown -= delta
+	elif grounded >= 3 and accel_vec.y > 16.0 and speed_kmh > 35.0:
+		_bottom_out_cooldown = 0.8
+		if _bottom_out_player and is_player:
+			_bottom_out_player.pitch_scale = randf_range(0.88, 1.05)
+			_bottom_out_player.volume_db = randf_range(-4.0, 0.0)
+			_bottom_out_player.play()
+
+	# High-Frequency Brake Rotor Squeal
+	if decel > 4.0 and speed_kmh > 25.0:
+		_brake_squeal_level = move_toward(_brake_squeal_level, clampf((decel / BRAKE_DECEL) * 0.065, 0.0, 0.08), delta * 8.0)
+	else:
+		_brake_squeal_level = move_toward(_brake_squeal_level, 0.0, delta * 6.0)
 
 	_skid = 0.0
 	for wheel in _all_wheels:
 		if wheel.is_in_contact():
 			_skid = maxf(_skid, 1.0 - wheel.get_skidinfo())
 
-	if is_player and Input.is_action_just_pressed("headlights"):
+	if is_player and InputMap.has_action("headlights") and Input.is_action_just_pressed("headlights"):
 		set_headlights(not headlights_on)
 
 	_update_rpm(absf(forward_speed), delta)
@@ -613,6 +685,13 @@ func _fill_effects_sound() -> void:
 			out_r += scrape
 			_scrape_level *= 0.9992
 
+		# High-frequency ceramic brake rotor squeal under heavy deceleration
+		if _brake_squeal_level > 0.001:
+			_brake_squeal_phase = fmod(_brake_squeal_phase + 3380.0 * inv_sr, 1.0)
+			var squeal := sin(_brake_squeal_phase * TAU) * _brake_squeal_level
+			out_l += squeal
+			out_r += squeal * 0.92
+
 		# Final Soft Saturation / Master Limiter
 		out_l = clampf(out_l, -0.95, 0.95)
 		out_r = clampf(out_r, -0.95, 0.95)
@@ -627,6 +706,24 @@ func set_headlights(on: bool) -> void:
 		_headlight_material.emission_energy_multiplier = 10.0 if on else 1.5
 	if _body_material:
 		_body_material.set_shader_parameter("headlights", 1.0 if on else 0.0)
+
+
+## Calculates aerodynamic slipstream drafting behind leading cars
+func update_slipstream(all_cars: Array) -> void:
+	slipstream_factor = 0.0
+	if all_cars.is_empty():
+		return
+	var my_fwd := global_transform.basis.z.normalized()
+	for other: Node3D in all_cars:
+		if other == self or not is_instance_valid(other):
+			continue
+		var to_other: Vector3 = other.global_position - global_position
+		var dist := to_other.length()
+		if dist > 2.0 and dist < 26.0:
+			var dot := my_fwd.dot(to_other.normalized())
+			if dot > 0.90:
+				var strength := (1.0 - (dist / 26.0)) * ((dot - 0.90) / 0.10)
+				slipstream_factor = maxf(slipstream_factor, strength)
 
 
 ## Puts the car back on the road, stopped, at the given transform.
@@ -998,6 +1095,8 @@ func _build_engine_sound() -> void:
 	_bov_player = _add_one_shot_player()
 	_backfire_player = _add_one_shot_player()
 	_impact_player = _add_one_shot_player()
+	_bottom_out_player = _add_one_shot_player()
+	_bottom_out_player.stream = load("res://sounds/impact_thud.wav")
 
 	# 6. Procedural Generator for High-Speed Stereo Wind & Curb Clatter
 	var generator := AudioStreamGenerator.new()

@@ -14,6 +14,9 @@ var _quality: OptionButton
 var _difficulty: OptionButton
 var _time_of_day: OptionButton
 var _fullscreen: CheckButton
+var _abs_btn: CheckButton
+var _tcs_btn: CheckButton
+var _volume_slider: HSlider
 
 
 func setup(main: Node) -> void:
@@ -23,7 +26,7 @@ func setup(main: Node) -> void:
 	_build()
 	var settings := ConfigFile.new()
 	settings.load(SETTINGS_PATH)
-	var track_idx: int = settings.get_value("race", "track", _main.current_track_index)
+	var track_idx: int = clampi(int(settings.get_value("race", "track", _main.current_track_index)), 0, maxi(0, _track.item_count - 1))
 	_track.select(track_idx)
 	var quality: int = settings.get_value("graphics", "quality", 1)
 	var fullscreen: bool = settings.get_value("graphics", "fullscreen", false)
@@ -37,6 +40,16 @@ func setup(main: Node) -> void:
 	_fullscreen.button_pressed = fullscreen
 	_main.apply_quality(quality)
 	_set_fullscreen(fullscreen)
+	var abs_val: bool = settings.get_value("assists", "abs", true)
+	var tcs_val: bool = settings.get_value("assists", "tcs", true)
+	var vol_val: float = float(settings.get_value("audio", "master_volume", 100.0))
+	_abs_btn.button_pressed = abs_val
+	_tcs_btn.button_pressed = tcs_val
+	if _main.car:
+		_main.car.abs_enabled = abs_val
+		_main.car.tcs_enabled = tcs_val
+	_volume_slider.value = vol_val
+	_set_master_volume(vol_val)
 	_panel.visible = false
 
 
@@ -64,7 +77,22 @@ func _save() -> void:
 	settings.set_value("race", "track", _track.selected)
 	settings.set_value("race", "difficulty", _difficulty.selected)
 	settings.set_value("race", "time_of_day", _time_of_day.selected)
+	if _abs_btn:
+		settings.set_value("assists", "abs", _abs_btn.button_pressed)
+	if _tcs_btn:
+		settings.set_value("assists", "tcs", _tcs_btn.button_pressed)
+	if _volume_slider:
+		settings.set_value("audio", "master_volume", _volume_slider.value)
 	settings.save(SETTINGS_PATH)
+
+
+func _set_master_volume(val: float) -> void:
+	if val <= 0.0:
+		AudioServer.set_bus_mute(0, true)
+	else:
+		AudioServer.set_bus_mute(0, false)
+		var db := linear_to_db(val / 100.0)
+		AudioServer.set_bus_volume_db(0, db)
 
 
 func _set_fullscreen(on: bool) -> void:
@@ -128,11 +156,53 @@ func _build() -> void:
 	_fullscreen.toggled.connect(func(on: bool):
 		_set_fullscreen(on)
 		_save())
+	_fullscreen.add_theme_font_size_override("font_size", 20)
 	column.add_child(_fullscreen)
 
-	_add_button(column, "Quit", func(): get_tree().quit())
+	# Master Audio Volume
+	var vol_row := HBoxContainer.new()
+	var v_lbl := Label.new()
+	v_lbl.text = "Master Volume"
+	v_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v_lbl.add_theme_font_size_override("font_size", 20)
+	vol_row.add_child(v_lbl)
+	_volume_slider = HSlider.new()
+	_volume_slider.min_value = 0.0
+	_volume_slider.max_value = 100.0
+	_volume_slider.step = 5.0
+	_volume_slider.value = 100.0
+	_volume_slider.custom_minimum_size = Vector2(120.0, 24.0)
+	_volume_slider.value_changed.connect(func(val: float):
+		_set_master_volume(val)
+		_save())
+	vol_row.add_child(_volume_slider)
+	column.add_child(vol_row)
 
-	_fullscreen.add_theme_font_size_override("font_size", 20)
+	# Driver Assists (ABS & TCS)
+	var assist_row := HBoxContainer.new()
+	assist_row.add_theme_constant_override("separation", 16)
+	_abs_btn = CheckButton.new()
+	_abs_btn.text = "ABS"
+	_abs_btn.button_pressed = true
+	_abs_btn.add_theme_font_size_override("font_size", 18)
+	_abs_btn.toggled.connect(func(on: bool):
+		if _main.car:
+			_main.car.abs_enabled = on
+		_save())
+	assist_row.add_child(_abs_btn)
+
+	_tcs_btn = CheckButton.new()
+	_tcs_btn.text = "TCS"
+	_tcs_btn.button_pressed = true
+	_tcs_btn.add_theme_font_size_override("font_size", 18)
+	_tcs_btn.toggled.connect(func(on: bool):
+		if _main.car:
+			_main.car.tcs_enabled = on
+		_save())
+	assist_row.add_child(_tcs_btn)
+	column.add_child(assist_row)
+
+	_add_button(column, "Quit", func(): get_tree().quit())
 
 
 ## A labelled dropdown row.

@@ -70,3 +70,26 @@ Found by driving the race through scripted runs, then fixed:
 - **Night Mode with Starry Sky & Dynamic Headlights**: CC0 Qwantani night sky with moon illumination, deep blue fog, and real shadow-casting dual headlights on the player car with automatic night activation for AI opponents.
 - **Refined Custom Car Mesh**: Elliptical wheel cutout pass restoring 840+ triangles along the front fender arch for smooth, seamless bodywork.
 
+## City & Environment Upgrades & Dynamic Road Mechanics
+
+- **CityGroundMesh (3,800m with 2K PBR Materials)**: Expanded 3.8 km x 3.8 km foundational city plaza with 2K photo-scanned tarred gravel diffuse, normal, and roughness textures.
+- **5 Selectable Tracks**:
+  - `Neo-Veridia // Sector-9`: Flagship cyberpunk corporate core and alternate network
+  - `Veridia Sky-Expressway`: Multi-level viaducts and highway ramps
+  - `Cyber-Harbor`: Quayside terminal straightaways and port flyovers
+  - `Synapse Midtown`: High-density urban grid with 90° chicanes
+  - `Sector-9 Autobahn A-95`: 1.76 km span high-velocity perimeter circuit
+- **3 Drivable Overpass & Alternate Routing Branches**:
+  - **▲ Sky-Expressway Overpass**: Elevated double-decker highway viaduct rising to $y = 16.2\text{m}$ across the urban canyon with concrete Jersey crash barriers, dual glowing cyan LED strips, and viaduct piers.
+  - **► Hyper-Straight Bypass**: Chord-straightened outer velocity straightaway with amber neon portal gantries.
+  - **◄ Neon Tunnel Split-Route**: Covered brutalist tunnel gallery with magenta neon light ribs spaced every $8.5\text{m}$.
+- **Color-Coded Multi-Route Minimap & Lap Checkpoints**:
+  - Custom HUD minimap rendering cyan (overpass), amber (bypass), and magenta (tunnel) alternate routes with legend badges.
+  - Expanded lap checkpoint bounding boxes ($163\text{m} \times 52\text{m}$) for seamless lap counting on ground avenues, elevated overpasses, and outer bypasses.
+- **Dynamic Road Mechanics (RoadRepairController)**:
+  - Ported from Unity C# to Godot 4.7 GDScript (`road_repair_controller.gd`).
+  - `Area3D` triggers with non-blocking async coroutines (`await get_tree().create_timer()`) and `GPUParticles3D` repair steam/sparks.
+  - Modifies `VehicleWheel3D` traction ($0.60\times$ damaged to $1.00\times$ fixed) and dynamically syncs with `car.road_traction_multiplier`.
+  - In-game dispatch via `K` key / gamepad `X`.
+
+

@@ -8,7 +8,7 @@ const BEND_ARC := 30.0 # length of track over which each bend is measured
 const BRAKING := 7.0 # m/s^2 the AI assumes it can shed when planning for a corner
 const SCAN_STEP := 18.0
 const SCAN_STEPS := 7
-const MAX_LANE := 4.5
+const MAX_LANE := 7.8
 
 var _car: VehicleBody3D
 var _main: Node
@@ -19,16 +19,19 @@ var _lane := 0.0
 var _lane_now := 0.0
 var _stuck_time := 0.0
 var _rev_phase := randf() * TAU
+var _route_pref: int = -1
+var _active_alt_curve: Curve3D = null
 
 
 ## skill scales every speed target; lane is the preferred offset from the centreline
-## in metres (+ is the driver's left).
-func setup(car: VehicleBody3D, main: Node, skill: float, lane: float) -> void:
+## in metres (+ is the driver's left); route_pref (0=Overpass, 1=Bypass, 2=Tunnel).
+func setup(car: VehicleBody3D, main: Node, skill: float, lane: float, route_pref: int = -1) -> void:
 	_car = car
 	_main = main
 	_skill = skill
 	_lane = lane
 	_lane_now = lane
+	_route_pref = route_pref
 
 
 func _physics_process(delta: float) -> void:
@@ -41,6 +44,35 @@ func _physics_process(delta: float) -> void:
 
 	var offset: float = _main.curve.get_closest_offset(_car.global_position)
 	var speed := _car.linear_velocity.length()
+
+	# If currently navigating an alternate overpass / bypass / tunnel branch
+	if _active_alt_curve != null:
+		var alt_len: float = _active_alt_curve.get_baked_length()
+		var alt_offset: float = _active_alt_curve.get_closest_offset(_car.global_position)
+		if alt_offset >= alt_len - 14.0:
+			# Merged back onto the main circuit
+			_active_alt_curve = null
+		else:
+			var aim_dist: float = minf(alt_len, alt_offset + 10.0 + speed * 0.45)
+			var target_pt: Vector3 = _active_alt_curve.sample_baked(aim_dist, true)
+			var aim: Vector3 = _car.global_transform.affine_inverse() * target_pt
+			input.steer = clampf(atan2(aim.x, aim.z) * 2.2, -1.0, 1.0)
+			var limit: float = STRAIGHT_SPEED * _skill * difficulty
+			input.accelerate = 1.0 if speed < limit else 0.0
+			input.brake = clampf((speed - limit) / 5.0, 0.0, 1.0) if speed > limit + 1.5 else 0.0
+			input.handbrake = false
+			_recover_if_stuck(offset, speed, delta)
+			return
+
+	# Check for alternate route branching opportunities
+	if _active_alt_curve == null and _route_pref >= 0 and _main.get("alternate_curves") != null:
+		var alt_curves: Array = _main.alternate_curves
+		if _route_pref < alt_curves.size():
+			var cand_curve: Curve3D = alt_curves[_route_pref]
+			if cand_curve.point_count > 0:
+				var entry_pt: Vector3 = cand_curve.get_point_position(0)
+				if _car.global_position.distance_to(entry_pt) < 22.0:
+					_active_alt_curve = cand_curve
 
 	_lane_now = move_toward(_lane_now, _choose_lane(offset), delta * 1.8)
 	var target: Transform3D = _main._track_transform(offset + 10.0 + speed * 0.45, 0.0)
@@ -79,10 +111,10 @@ func _choose_lane(offset: float) -> float:
 		if rel.z < 0.0 or rel.z > 16.0:
 			continue
 		var other_lane := (other.global_position - here.origin).dot(here.basis.x)
-		if absf(other_lane - _lane_now) < 2.6 and other.linear_velocity.length() < my_speed + 1.0:
-			var pass_lane := other_lane + 3.2 if _lane_now >= other_lane else other_lane - 3.2
+		if absf(other_lane - _lane_now) < 3.2 and other.linear_velocity.length() < my_speed + 1.0:
+			var pass_lane := other_lane + 4.5 if _lane_now >= other_lane else other_lane - 4.5
 			if absf(pass_lane) > MAX_LANE:
-				pass_lane = other_lane - 3.2 * signf(pass_lane)
+				pass_lane = other_lane - 4.5 * signf(pass_lane)
 			return clampf(pass_lane, -MAX_LANE, MAX_LANE)
 	return _lane
 

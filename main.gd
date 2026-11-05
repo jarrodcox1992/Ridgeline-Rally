@@ -7,60 +7,78 @@ const MinimapScript := preload("res://minimap.gd")
 const PauseMenuScript := preload("res://pause_menu.gd")
 const AIDriverScript := preload("res://ai_driver.gd")
 const PhotoModeScript := preload("res://photo_mode.gd")
+const CityBuilderScript := preload("res://city_builder.gd")
+const RoadRepairControllerScript := preload("res://road_repair_controller.gd")
 
-## Multi-track data definitions with 3D coordinates (x, y, z) in metres.
-const TRACK_DATA := [
+## Multi-Track Cyberpunk Metropolis & High-Speed Expressway Circuits
+const CITY_TRACKS: Array[Dictionary] = [
 	{
-		"name": "Alpine Pass",
-		"desc": "Flowing mountain pass with rolling crests and valley dips",
-		"points": [
-			Vector3(0.0, 0.0, -200.0), Vector3(120.0, 5.0, -210.0), Vector3(220.0, 14.0, -150.0),
-			Vector3(250.0, 18.0, -40.0), Vector3(200.0, 12.0, 40.0), Vector3(110.0, 2.0, 50.0),
-			Vector3(60.0, -6.0, 120.0), Vector3(90.0, -4.0, 210.0), Vector3(20.0, 3.0, 260.0),
-			Vector3(-110.0, 12.0, 240.0), Vector3(-200.0, 8.0, 170.0), Vector3(-230.0, 0.0, 60.0),
-			Vector3(-160.0, -6.0, -30.0), Vector3(-200.0, -4.0, -120.0), Vector3(-120.0, -1.0, -190.0),
-		],
+		"name": "Neo-Veridia // Sector-9",
+		"desc": "Flagship Cyberpunk Metropolis: Corporate Core, Multi-Level Sky-Expressway Overpass, Hyper-Straight Bypass & Cyber-Docklands",
+		"file": "res://tracks/CityDowntownLoop.csv",
+		"span": 1120.0,
+		"step": 4,
+		"elev_amp": 0.0,
+		"elev_type": "flat",
+		"district": "NEO-VERIDIA // SECTOR-9",
+		"road_title": "VERIDIA GRAND EXPRESSWAY",
+		"speed_limit": "50 MPH",
 	},
 	{
-		"name": "Mount Akina Touge",
-		"desc": "Downhill mountain pass with tight switchbacks and 72m vertical drop",
-		"points": [
-			Vector3(0.0, 42.0, -290.0), Vector3(140.0, 40.0, -290.0), Vector3(260.0, 34.0, -230.0),
-			Vector3(290.0, 28.0, -130.0), Vector3(210.0, 22.0, -60.0), Vector3(100.0, 16.0, -50.0),
-			Vector3(60.0, 10.0, 30.0), Vector3(140.0, 4.0, 90.0), Vector3(230.0, -2.0, 100.0),
-			Vector3(270.0, -10.0, 170.0), Vector3(200.0, -18.0, 240.0), Vector3(80.0, -26.0, 280.0),
-			Vector3(-40.0, -30.0, 290.0), Vector3(-160.0, -26.0, 260.0), Vector3(-250.0, -16.0, 190.0),
-			Vector3(-290.0, -4.0, 90.0), Vector3(-270.0, 10.0, -20.0), Vector3(-290.0, 22.0, -120.0),
-			Vector3(-240.0, 32.0, -210.0), Vector3(-120.0, 39.0, -270.0),
-		],
+		"name": "Veridia Sky-Expressway",
+		"desc": "Sweeping Multi-Tiered Elevated Highway Overpasses, High-Speed Viaduct Straights & Interchange Ramps",
+		"file": "res://tracks/CitySkylineExpressway.csv",
+		"span": 1520.0,
+		"step": 3,
+		"elev_amp": 16.0,
+		"elev_type": "multi_overpass",
+		"district": "SKY-EXPRESSWAY // INTERCHANGE",
+		"road_title": "ELEVATED SKYWAY LOOP",
+		"speed_limit": "75 MPH",
 	},
 	{
-		"name": "Coastal Super-Speedway",
-		"desc": "High-speed drafting circuit with 300+ km/h straights and banked bends",
-		"points": [
-			Vector3(-100.0, 0.0, -320.0), Vector3(100.0, 2.0, -320.0), Vector3(260.0, 6.0, -290.0),
-			Vector3(360.0, 12.0, -180.0), Vector3(380.0, 16.0, -40.0), Vector3(340.0, 18.0, 100.0),
-			Vector3(240.0, 22.0, 220.0), Vector3(100.0, 14.0, 290.0), Vector3(-60.0, 4.0, 310.0),
-			Vector3(-200.0, -8.0, 270.0), Vector3(-310.0, -5.0, 170.0), Vector3(-360.0, 0.0, 30.0),
-			Vector3(-340.0, 2.0, -120.0), Vector3(-240.0, 1.0, -240.0),
-		],
+		"name": "Cyber-Harbor",
+		"desc": "Long Waterfront Terminal Straightaways, Elevated Port Flyovers & Industrial Container Quaysides",
+		"file": "res://tracks/CityWaterfront.csv",
+		"span": 1480.0,
+		"step": 3,
+		"elev_amp": 12.0,
+		"elev_type": "flyover",
+		"district": "CYBER-DOCKLANDS // HARBOR",
+		"road_title": "HARBOR TERMINAL PKWY",
+		"speed_limit": "70 MPH",
 	},
 	{
-		"name": "Forest Grand Prix",
-		"desc": "FIA-grade technical road course with chicanes, blind crests and plunging esses",
-		"points": [
-			Vector3(0.0, 0.0, -240.0), Vector3(130.0, 3.0, -240.0), Vector3(230.0, 8.0, -170.0),
-			Vector3(270.0, 14.0, -70.0), Vector3(200.0, 18.0, 0.0), Vector3(260.0, 24.0, 80.0),
-			Vector3(190.0, 18.0, 170.0), Vector3(100.0, 4.0, 250.0), Vector3(-20.0, -8.0, 280.0),
-			Vector3(-130.0, -16.0, 250.0), Vector3(-220.0, -10.0, 170.0), Vector3(-270.0, 0.0, 80.0),
-			Vector3(-260.0, 8.0, -20.0), Vector3(-150.0, 5.0, -90.0), Vector3(-160.0, 2.0, -165.0),
-			Vector3(-100.0, 0.0, -220.0),
-		],
+		"name": "Synapse Midtown",
+		"desc": "Dense Multi-Block Urban Grid with Alternate Bypass Avenues, Overpass Crossings & 90-Degree Chicanes",
+		"file": "res://tracks/CityMidtownGrid.csv",
+		"span": 1360.0,
+		"step": 2,
+		"elev_amp": 14.0,
+		"elev_type": "multi_overpass",
+		"district": "SYNAPSE MIDTOWN // GRID-04",
+		"road_title": "SYNAPSE CROSS-AVENUE",
+		"speed_limit": "60 MPH",
+	},
+	{
+		"name": "Sector-9 Autobahn A-95",
+		"desc": "Massive 1.76 km Span Ultra-High-Speed Perimeter Highway with Long Straightaways & Elevated Viaducts",
+		"file": "res://tracks/AutobahnA95.csv",
+		"span": 1760.0,
+		"step": 3,
+		"elev_amp": 18.0,
+		"elev_type": "multi_overpass",
+		"district": "SECTOR-9 // PERIMETER AUTOBAHN",
+		"road_title": "AUTOBAHN A-95 EXPRESS",
+		"speed_limit": "UNLIMITED",
 	},
 ]
-const ROAD_HALF_WIDTH := 7.0
-const ROAD_HEIGHT := 0.12
-const TERRAIN_SIZE := 1500.0
+
+## Active runtime track dataset populated from open-source datasets + classic circuits
+var TRACK_DATA: Array[Dictionary] = []
+const ROAD_HALF_WIDTH := 11.5 # 23m wide 4-lane highway with emergency breakdown shoulders
+const ROAD_HEIGHT := 0.22
+const TERRAIN_SIZE := 3800.0
 const TERRAIN_RES := 150
 const CHECKPOINT_COUNT := 10
 const TREE_COUNT := 1100
@@ -70,14 +88,13 @@ const TREE_PATCH_SIZE := 200.0
 ## costly to draw when the sun is low, and far-off ones can't be seen through the haze.
 const TREE_SHADOW_RANGE := 260.0
 const GRASS_PER_METRE := 16
-const GRASS_BAND := Vector2(9.8, 40.0) # distance from the track centreline
+const GRASS_BAND := Vector2(18.5, 52.0) # distance from the highway centreline (well clear of road)
 const GRASS_CHUNK_LENGTH := 60.0
 const ROCK_MODELS := ["res://models/rock_moss_set_01/rock_moss_set_01.gltf", "res://models/boulder_01/boulder_01.gltf"]
-const DASH_LENGTH := 3.0
-const DASH_GAP := 6.0
+const DASH_LENGTH := 4.5
+const DASH_GAP := 7.5
 const CORNER_TURN := 0.08 # radians of heading change over 16 m that counts as a corner
-const KERB_SEGMENT := 1.5
-const GUARDRAIL_OFFSET := 12.0
+const GUARDRAIL_OFFSET := 12.8
 const ROCK_COUNT := 140
 const BOULDER_COUNT := 14
 ## Size in metres of one baked tree frame (matches the bake's camera).
@@ -98,25 +115,25 @@ const OPPONENTS := [
 	{"name": "Pearl", "color": Color(0.85, 0.85, 0.82), "skill": 0.96},
 	{"name": "Red", "color": Color(0.62, 0.04, 0.03), "skill": 0.92},
 ]
-## Start grid slots behind the line: distance back and offset to the driver's left.
-## The player starts from the last slot.
-const GRID := [Vector2(10.0, 3.0), Vector2(18.0, -3.0), Vector2(26.0, 3.0), Vector2(34.0, -3.0)]
+## Start grid slots across highway lanes: distance back and offset to driver's left.
+## Staggered across lanes: Lane 1 (-4.6m), Lane 4 (+4.6m), Lane 2 (-1.5m), Lane 1 (-4.6m)
+const GRID := [Vector2(14.0, -4.6), Vector2(26.0, 4.6), Vector2(38.0, 1.5), Vector2(50.0, -4.6)]
 ## Times of day. Each sky is a Poly Haven HDRI; "sun" points towards the sun in it, found by
 ## aiming a camera at its brightest pixel. The sunset sun is raised a little above the
 ## horizon (about 14 degrees) so shadows don't stretch for hundreds of metres.
 const TIMES_OF_DAY := [
-	{"name": "Day", "sky": "res://textures/sky/kloofendal_puresky_4k.hdr", "sun": Vector3(-0.374, 0.745, 0.552),
-		"sun_color": Color(1.0, 0.95, 0.88), "sun_energy": 1.6, "sky_energy": 1.0, "exposure": 1.0,
-		"fog_color": Color(0.7, 0.76, 0.85), "fog_density": 0.0012, "contrast": 1.0, "saturation": 1.0,
-		"shadow_scale": 1.0},
+	{"name": "Day", "sky": "res://textures/sky/kloofendal_puresky_4k.hdr", "sun": Vector3(-0.46, 0.36, 0.80),
+		"sun_color": Color(1.0, 0.86, 0.68), "sun_energy": 2.45, "sky_energy": 1.02, "exposure": 0.96,
+		"fog_color": Color(0.94, 0.84, 0.70), "fog_density": 0.00075, "contrast": 1.14, "saturation": 1.16,
+		"shadow_scale": 0.95},
 	{"name": "Sunset", "sky": "res://textures/sky/belfast_sunset_puresky_4k.hdr", "sun": Vector3(-0.54, 0.25, 0.84),
-		"sun_color": Color(1.0, 0.55, 0.28), "sun_energy": 2.2, "sky_energy": 1.0, "exposure": 0.72,
-		"fog_color": Color(0.5, 0.42, 0.4), "fog_density": 0.0005, "contrast": 1.18, "saturation": 1.2,
-		"shadow_scale": 0.55}, # a low sun's long shadows are expensive, so draw them over a shorter range
+		"sun_color": Color(1.0, 0.58, 0.30), "sun_energy": 2.35, "sky_energy": 1.04, "exposure": 0.78,
+		"fog_color": Color(0.82, 0.58, 0.44), "fog_density": 0.00085, "contrast": 1.18, "saturation": 1.20,
+		"shadow_scale": 0.75},
 	{"name": "Night", "sky": "res://textures/sky/qwantani_night_puresky_2k.hdr", "sun": Vector3(-0.3, 0.7, 0.4),
-		"sun_color": Color(0.35, 0.45, 0.75), "sun_energy": 0.15, "sky_energy": 0.7, "exposure": 0.95,
-		"fog_color": Color(0.04, 0.06, 0.12), "fog_density": 0.0018, "contrast": 1.15, "saturation": 1.1,
-		"shadow_scale": 0.4},
+		"sun_color": Color(0.32, 0.46, 0.78), "sun_energy": 0.18, "sky_energy": 0.22, "exposure": 0.96,
+		"fog_color": Color(0.03, 0.06, 0.12), "fog_density": 0.00065, "contrast": 1.18, "saturation": 1.18,
+		"shadow_scale": 0.6},
 ]
 const TERRAIN_TEXTURES := {
 	"grass_albedo": "res://textures/aerial_grass_rock/aerial_grass_rock_diff_2k.jpg",
@@ -300,6 +317,9 @@ void fragment() {
 """
 
 var curve: Curve3D
+var alternate_curves: Array[Curve3D] = []
+var branch_junctions: Array[Dictionary] = []
+var road_repair_zones: Array[RoadRepairController] = []
 var track_length := 0.0
 var track_path: Path3D
 var car: VehicleBody3D
@@ -355,7 +375,120 @@ var _track_root: Node3D
 var minimap_ctrl: Control
 var _track_bounds_min := Vector2(-400.0, -400.0)
 var _track_bounds_max := Vector2(400.0, 400.0)
-var current_quality_level := 1
+var current_quality_level := 2
+
+# Dynamic Cockpit & Camera G-Force Inertia Rig
+var _head_inertia_pos := Vector3.ZERO
+var _head_inertia_rot := Vector3.ZERO
+
+# Sector Split Delta-Time Tracking
+var current_split_times: Array[float] = [0.0, 0.0, 0.0, 0.0]
+var best_split_times: Array[float] = [0.0, 0.0, 0.0, 0.0]
+var sector_delta_label: Label
+var sector_delta_timer: float = 0.0
+var sector_delta_text: String = ""
+var sector_delta_color: Color = Color.WHITE
+
+# Cockpit & HUD G-Force Telemetry & Driver Assists
+var g_meter_ctrl: Control
+var abs_indicator: Label
+var tcs_indicator: Label
+var g_force_val_label: Label
+
+
+class GMeterWidget extends Control:
+	var car: Node3D
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(84.0, 84.0)
+
+	func _draw() -> void:
+		var center := Vector2(42.0, 42.0)
+		draw_circle(center, 40.0, Color(0.04, 0.06, 0.09, 0.75))
+		draw_arc(center, 24.0, 0, TAU, 32, Color(0.35, 0.55, 0.75, 0.35), 1.2)
+		draw_arc(center, 36.0, 0, TAU, 32, Color(0.25, 0.4, 0.55, 0.22), 1.0)
+		draw_line(Vector2(6.0, 42.0), Vector2(78.0, 42.0), Color(0.4, 0.55, 0.7, 0.25), 1.0)
+		draw_line(Vector2(42.0, 6.0), Vector2(42.0, 78.0), Color(0.4, 0.55, 0.7, 0.25), 1.0)
+		var g_lat: float = car.get("g_force_lateral") if (car and "g_force_lateral" in car) else 0.0
+		var g_lon: float = car.get("g_force_longitudinal") if (car and "g_force_longitudinal" in car) else 0.0
+		var total_g := sqrt(g_lat * g_lat + g_lon * g_lon)
+		var puck_pos := center + Vector2(clampf(g_lat * 24.0, -36.0, 36.0), clampf(-g_lon * 24.0, -36.0, 36.0))
+		var dot_col := Color(0.2, 0.95, 0.4)
+		if total_g > 1.25:
+			dot_col = Color(1.0, 0.2, 0.15)
+		elif total_g > 0.85:
+			dot_col = Color(1.0, 0.75, 0.1)
+		draw_line(center, puck_pos, Color(dot_col.r, dot_col.g, dot_col.b, 0.45), 1.5)
+		draw_circle(puck_pos, 4.0, dot_col)
+
+
+func _init() -> void:
+	_init_tracks()
+
+
+func _init_tracks() -> void:
+	TRACK_DATA.clear()
+	for circuit in CITY_TRACKS:
+		var pts := _load_osm_track(circuit.file, circuit)
+		TRACK_DATA.append({
+			"name": circuit.name,
+			"desc": circuit.desc,
+			"points": pts,
+			"district": circuit.get("district", "METROPOLIS"),
+			"road_title": circuit.get("road_title", circuit.name),
+			"speed_limit": circuit.get("speed_limit", "45 MPH"),
+		})
+
+
+func _load_osm_track(path: String, cfg: Dictionary) -> Array[Vector3]:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if not file:
+		push_error("Failed to open open-source track file: " + path)
+		return []
+	var pts: Array[Vector2] = []
+	while not file.eof_reached():
+		var line := file.get_line().strip_edges()
+		if line.is_empty() or line.begins_with("#"):
+			continue
+		var parts := line.split(",")
+		if parts.size() >= 2:
+			pts.append(Vector2(parts[0].to_float(), parts[1].to_float()))
+
+	if pts.is_empty():
+		return []
+
+	var step: int = int(cfg.get("step", 3))
+	var min_p := Vector2(1e9, 1e9)
+	var max_p := Vector2(-1e9, -1e9)
+	for p in pts:
+		min_p = min_p.min(p)
+		max_p = max_p.max(p)
+	var center := (min_p + max_p) * 0.5
+	var span := maxf(max_p.x - min_p.x, max_p.y - min_p.y)
+	var target_span: float = float(cfg.get("span", 780.0))
+	var scale: float = target_span / span
+
+	var n_sub := int(pts.size() / step)
+	var pts3d: Array[Vector3] = []
+	var elev_amp: float = float(cfg.get("elev_amp", 0.0))
+	var elev_type: String = str(cfg.get("elev_type", "flat"))
+	for i in n_sub:
+		var p2d := (pts[i * step] - center) * scale
+		var progress := float(i) / float(n_sub)
+		var y := 0.0
+		match elev_type:
+			"flyover":
+				y = elev_amp * pow(sin(progress * PI), 2.0)
+			"multi_overpass":
+				# Keep start/finish straight flat (progress 0..0.08 and 0.92..1.0), with sweeping multi-level overpasses across the circuit
+				var ramp_env := smoothstep(0.06, 0.14, progress) * (1.0 - smoothstep(0.86, 0.94, progress))
+				y = elev_amp * pow(sin(progress * PI * 2.0), 2.0) * ramp_env
+			"flat":
+				y = 0.0
+			_:
+				y = 0.0
+		pts3d.append(Vector3(p2d.x, y, p2d.y))
+	return pts3d
 
 
 func _ready() -> void:
@@ -374,14 +507,13 @@ func _ready() -> void:
 	add_child(_track_root)
 
 	_build_track_curve()
-	_build_terrain()
 	_build_road()
+	_build_alternate_routes_and_overpasses()
 	_build_start_line()
 	_build_road_details()
+	_build_dynamic_road_repairs()
 	_build_checkpoints()
-	_build_trees()
-	_build_grass()
-	_build_rocks()
+	CityBuilderScript.build_city(self, _track_root)
 	_spawn_car()
 	_build_camera()
 	_build_hud()
@@ -399,8 +531,15 @@ func _physics_process(delta: float) -> void:
 		lap_time += delta
 	_update_race(delta)
 
+	# Dynamic slipstream drafting calculation across all vehicles
+	for c in cars:
+		if is_instance_valid(c):
+			c.update_slipstream(cars)
+
 	if Input.is_action_just_pressed("next_track"):
 		load_track((current_track_index + 1) % TRACK_DATA.size())
+	if Input.is_action_just_pressed("repair_road"):
+		_trigger_nearest_road_repair()
 	if Input.is_action_just_pressed("reset_car"):
 		_reset_car()
 	if Input.is_action_just_pressed("show_fps"):
@@ -420,10 +559,14 @@ func _physics_process(delta: float) -> void:
 	if car:
 		var offset := curve.get_closest_offset(car.global_position)
 		var t_xform := _track_transform(offset, 0.0)
+		# Remember the last place the car was genuinely on the road surface, so a reset returns it there
+		# (not onto an elevated deck or box that happens to be nearest in 3D).
+		if absf(car.global_position.y - t_xform.origin.y) < 0.8:
+			_last_grounded_offset = offset
 		var lateral_dist := absf((t_xform.affine_inverse() * car.global_position).x)
-		var on_kerb: bool = _is_in_corner(offset) and lateral_dist > (ROAD_HALF_WIDTH - 0.6) and lateral_dist < (ROAD_HALF_WIDTH + 1.4)
-		(car as CarScript).on_curb = on_kerb
-		if on_kerb:
+		var on_rumble: bool = lateral_dist > 9.0 and lateral_dist < 9.6
+		(car as CarScript).on_curb = on_rumble
+		if on_rumble:
 			var speed := car.linear_velocity.length()
 			camera_shake = maxf(camera_shake, clampf(speed / 30.0, 0.0, 1.0) * 0.045)
 
@@ -452,6 +595,32 @@ func _process(delta: float) -> void:
 		time_label.text = "Time  " + (_format_time(lap_time) if lap_running else "--:--.--")
 	last_label.text = "Last  " + _format_time(last_lap)
 	best_label.text = "Best  " + _format_time(best_lap)
+	if sector_delta_label:
+		if sector_delta_timer > 0.0:
+			sector_delta_timer -= delta
+			sector_delta_label.text = "Split  " + sector_delta_text
+			sector_delta_label.add_theme_color_override("font_color", sector_delta_color)
+			sector_delta_label.modulate.a = clampf(sector_delta_timer, 0.0, 1.0)
+			sector_delta_label.visible = true
+		else:
+			sector_delta_label.visible = false
+
+	# Update Live G-Meter & Assist indicators
+	if g_meter_ctrl:
+		g_meter_ctrl.queue_redraw()
+	if car:
+		var is_abs: bool = bool(car.get("abs_active"))
+		var is_tcs: bool = bool(car.get("tcs_active"))
+		if abs_indicator:
+			abs_indicator.add_theme_color_override("font_color", Color(1.0, 0.75, 0.1) if is_abs else Color(0.35, 0.4, 0.45, 0.5))
+		if tcs_indicator:
+			tcs_indicator.add_theme_color_override("font_color", Color(1.0, 0.75, 0.1) if is_tcs else Color(0.35, 0.4, 0.45, 0.5))
+		if g_force_val_label:
+			var lat_g: float = car.get("g_force_lateral") if "g_force_lateral" in car else 0.0
+			var lon_g: float = car.get("g_force_longitudinal") if "g_force_longitudinal" in car else 0.0
+			var tot_g := sqrt(lat_g * lat_g + lon_g * lon_g)
+			g_force_val_label.text = "%.2f G" % tot_g
+
 	if message_timer > 0.0:
 		message_timer -= delta
 		message_label.modulate.a = clampf(message_timer, 0.0, 1.0)
@@ -498,6 +667,9 @@ func set_time_of_day(index: int) -> void:
 	_shadow_scale = time.shadow_scale
 	sun.directional_shadow_max_distance = _shadow_distance * _shadow_scale
 	var is_night: bool = time.name == "Night"
+	env.fog_aerial_perspective = 0.22 if is_night else 0.32
+	env.fog_sky_affect = 0.08 if is_night else 0.06
+	env.fog_sun_scatter = 0.08 if is_night else 0.65
 	for c in cars:
 		if c.has_method("set_headlights"):
 			c.set_headlights(is_night)
@@ -525,15 +697,20 @@ func apply_quality(level: int) -> void:
 	current_quality_level = level
 	var viewport := get_viewport()
 	viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
-	viewport.scaling_3d_scale = [0.7, 1.0, 1.0][level]
-	env.ssao_enabled = level == 2
-	# Lets glossy paint and glass reflect the road, other cars and trees, not just the sky.
-	# It costs about a third of the frame rate on a 2019 MacBook Pro, so High only.
+	viewport.scaling_3d_scale = [0.75, 1.0, 1.0][level]
+	env.ssao_enabled = level >= 1
+	env.ssao_radius = 1.4
+	env.ssao_intensity = 2.0
+	env.ssao_light_affect = 0.20
 	env.ssr_enabled = level == 2
-	env.ssr_max_steps = 48
+	env.ssr_max_steps = 32
+	env.ssr_fade_in = 0.15
+	env.ssr_fade_out = 2.0
+	env.ssil_enabled = false
 	env.glow_enabled = level >= 1
-	_shadow_distance = [120.0, 200.0, 300.0][level]
+	_shadow_distance = [120.0, 200.0, 260.0][level]
 	sun.directional_shadow_max_distance = _shadow_distance * _shadow_scale
+	sun.directional_shadow_blend_splits = level >= 1
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if level == 0 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 	for grass in grass_instances:
 		grass.visible = level >= 1
@@ -556,6 +733,7 @@ func _setup_input() -> void:
 	_add_action("headlights", [KEY_H], [JOY_BUTTON_DPAD_UP], [])
 	_add_action("look_back", [KEY_B], [JOY_BUTTON_LEFT_SHOULDER], [])
 	_add_action("show_fps", [KEY_F], [], [])
+	_add_action("repair_road", [KEY_K], [JOY_BUTTON_X], [])
 	_add_action("photo_mode", [KEY_V], [JOY_BUTTON_RIGHT_SHOULDER], [])
 	_add_action("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START], [])
 
@@ -632,29 +810,41 @@ func _track_closest_point(x: float, z: float) -> Vector3:
 
 func _distance_to_track(x: float, z: float) -> float:
 	var closest := _track_closest_point(x, z)
-	return Vector2(closest.x - x, closest.z - z).length()
+	var min_d := Vector2(closest.x - x, closest.z - z).length()
+	for alt_c in alternate_curves:
+		var apt := alt_c.get_closest_point(Vector3(x, 0.0, z))
+		var ad := Vector2(apt.x - x, apt.z - z).length()
+		if ad < min_d:
+			min_d = ad
+	return min_d
 
 
-## Ground is smoothly blended to road height near the road, rolls into hills further out,
-## and rises into a ring of mountains at the edge of the map.
-func _terrain_height(x: float, z: float) -> float:
-	var margin := 75.0
-	var hills := (noise.get_noise_2d(x, z) * 0.5 + 0.5) * 65.0
-	var edge := maxf(absf(x), absf(z))
-	var ridge := noise.get_noise_2d(x * 2.0 + 500.0, z * 2.0) * 0.5 + 0.5
-	var mountains := smoothstep(440.0, 720.0, edge) * 160.0 * (0.6 + 0.4 * ridge)
-	var far_h := hills + mountains
+## Returns whether the given track offset and side falls within an on-ramp, off-ramp, or merge junction zone
+func is_branch_junction(track_offset: float, side: float) -> bool:
+	for j in branch_junctions:
+		if (j.side < 0.0 and side < 0.0) or (j.side > 0.0 and side > 0.0):
+			var s: float = float(j.start)
+			var e: float = float(j.end)
+			if s <= e:
+				if track_offset >= s and track_offset <= e:
+					return true
+			else:
+				if track_offset >= s or track_offset <= e:
+					return true
+	return false
 
-	# Fast rejection for terrain vertices outside track bounding envelope
-	if x < _track_bounds_min.x - margin or x > _track_bounds_max.x + margin or z < _track_bounds_min.y - margin or z > _track_bounds_max.y + margin:
-		return far_h
 
-	var closest := _track_closest_point(x, z)
-	var d := Vector2(closest.x - x, closest.z - z).length()
-	var road_h := closest.y
-	var blend := smoothstep(ROAD_HALF_WIDTH + 2.5, 65.0, d)
-	var local_terrain := road_h + hills * 0.8
-	return lerpf(road_h, lerpf(local_terrain, far_h, smoothstep(65.0, 200.0, d)), blend)
+## Returns whether the 3D point is within min_dist of any alternate bypass, overpass, or tunnel route
+func is_point_near_branch(pt: Vector3, min_dist: float) -> bool:
+	for alt_c in alternate_curves:
+		var closest: Vector3 = alt_c.get_closest_point(pt)
+		if Vector2(closest.x - pt.x, closest.z - pt.z).length() < min_dist:
+			return true
+	return false
+
+
+func _terrain_height(_x: float, _z: float) -> float:
+	return 0.0
 
 
 # --- World building ------------------------------------------------------
@@ -672,10 +862,15 @@ func _build_environment() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.ssao_enabled = true
 	env.glow_enabled = true
-	env.glow_bloom = 0.05
+	env.glow_bloom = 0.12
+	env.glow_intensity = 0.85
+	env.glow_strength = 1.05
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	env.fog_enabled = true
-	env.fog_aerial_perspective = 0.8
-	env.fog_sky_affect = 0.0
+	env.fog_light_color = Color(0.55, 0.62, 0.75)
+	env.fog_density = 0.0006
+	env.fog_aerial_perspective = 0.75
+	env.fog_sky_affect = 0.05
 	var world_env := WorldEnvironment.new()
 	world_env.environment = env
 	add_child(world_env)
@@ -688,86 +883,430 @@ func _build_environment() -> void:
 
 
 func _build_terrain() -> void:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var step := TERRAIN_SIZE / TERRAIN_RES
-	var half := TERRAIN_SIZE * 0.5
-	for zi in TERRAIN_RES + 1:
-		for xi in TERRAIN_RES + 1:
-			var x := -half + xi * step
-			var z := -half + zi * step
-			st.set_uv(Vector2(xi, zi) / TERRAIN_RES)
-			st.add_vertex(Vector3(x, _terrain_height(x, z), z))
-	var row := TERRAIN_RES + 1
-	for zi in TERRAIN_RES:
-		for xi in TERRAIN_RES:
-			var i := zi * row + xi
-			st.add_index(i)
-			st.add_index(i + 1)
-			st.add_index(i + row)
-			st.add_index(i + 1)
-			st.add_index(i + row + 1)
-			st.add_index(i + row)
-	st.generate_normals()
-	st.generate_tangents()
-	var mesh := st.commit()
-
-	var noise_texture := NoiseTexture2D.new()
-	noise_texture.seamless = true
-	noise_texture.noise = FastNoiseLite.new()
-	var shader := Shader.new()
-	shader.code = TERRAIN_SHADER
-	var material := ShaderMaterial.new()
-	material.shader = shader
-	material.set_shader_parameter("noise_tex", noise_texture)
-	for param: String in TERRAIN_TEXTURES:
-		material.set_shader_parameter(param, load(TERRAIN_TEXTURES[param]))
-
-	var instance := MeshInstance3D.new()
-	instance.mesh = mesh
-	instance.material_override = material
-	_track_root.add_child(instance)
-
-	var body := StaticBody3D.new()
-	body.name = "Terrain"
-	var shape := CollisionShape3D.new()
-	var trimesh := mesh.create_trimesh_shape() as ConcavePolygonShape3D
-	trimesh.backface_collision = true
-	shape.shape = trimesh
-	body.add_child(shape)
-	_track_root.add_child(body)
+	pass
 
 
 func _build_road() -> void:
 	var asphalt := StandardMaterial3D.new()
 	asphalt.albedo_texture = load("res://textures/asphalt_track/asphalt_track_diff_2k.jpg")
+	asphalt.albedo_color = Color(0.72, 0.74, 0.78)
 	asphalt.normal_enabled = true
 	asphalt.normal_texture = load("res://textures/asphalt_track/asphalt_track_nor_gl_2k.jpg")
+	asphalt.normal_scale = 1.35
 	asphalt.roughness_texture = load("res://textures/asphalt_track/asphalt_track_rough_2k.jpg")
+	asphalt.roughness = 0.28
+	asphalt.metallic = 0.25
+	asphalt.clearcoat_enabled = true
+	asphalt.clearcoat = 0.42
+	asphalt.clearcoat_roughness = 0.14
 	asphalt.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	asphalt.uv1_triplanar = true
 	asphalt.uv1_world_triplanar = true
-	asphalt.uv1_scale = Vector3.ONE * 0.5 # the texture covers 2 m
+	asphalt.uv1_scale = Vector3.ONE * 0.5
 
-	# Cross-section with sloped shoulders so the car can drive on and off the road.
+	# 23m wide multi-lane city avenue meeting sidewalks and granite curbs flush
 	var road := _add_track_strip(PackedVector2Array([
-		Vector2(-ROAD_HALF_WIDTH - 2.5, -0.6), Vector2(-ROAD_HALF_WIDTH, ROAD_HEIGHT),
-		Vector2(ROAD_HALF_WIDTH, ROAD_HEIGHT), Vector2(ROAD_HALF_WIDTH + 2.5, -0.6),
+		Vector2(-ROAD_HALF_WIDTH, 0.0), Vector2(-ROAD_HALF_WIDTH, ROAD_HEIGHT),
+		Vector2(ROAD_HALF_WIDTH, ROAD_HEIGHT), Vector2(ROAD_HALF_WIDTH, 0.0),
 	]), asphalt)
 	road.use_collision = true
 
-	var paint := StandardMaterial3D.new()
-	paint.albedo_color = Color(0.92, 0.92, 0.9)
-	paint.roughness = 0.6
+	# Outer solid white shoulder lines (fog lines) at ±9.2m separating 4 travel lanes from emergency breakdown shoulders
+	var white_paint := StandardMaterial3D.new()
+	white_paint.albedo_color = Color(0.95, 0.95, 0.93)
+	white_paint.roughness = 0.5
 	for side in [-1.0, 1.0]:
-		var inner: float = side * (ROAD_HALF_WIDTH - 0.6)
-		var outer: float = side * (ROAD_HALF_WIDTH - 0.35)
-		var a := minf(inner, outer)
-		var b := maxf(inner, outer)
+		var x: float = side * 9.2
 		_add_track_strip(PackedVector2Array([
-			Vector2(a, ROAD_HEIGHT), Vector2(a, ROAD_HEIGHT + 0.012),
-			Vector2(b, ROAD_HEIGHT + 0.012), Vector2(b, ROAD_HEIGHT),
-		]), paint)
+			Vector2(x - 0.1, ROAD_HEIGHT), Vector2(x - 0.1, ROAD_HEIGHT + 0.012),
+			Vector2(x + 0.1, ROAD_HEIGHT + 0.012), Vector2(x + 0.1, ROAD_HEIGHT),
+		]), white_paint)
+
+	# Center double solid yellow median dividing lines
+	var yellow_paint := StandardMaterial3D.new()
+	yellow_paint.albedo_color = Color(0.98, 0.82, 0.12) # Highway Yellow
+	yellow_paint.roughness = 0.5
+	for side in [-1.0, 1.0]:
+		var x: float = side * 0.18
+		_add_track_strip(PackedVector2Array([
+			Vector2(x - 0.07, ROAD_HEIGHT), Vector2(x - 0.07, ROAD_HEIGHT + 0.012),
+			Vector2(x + 0.07, ROAD_HEIGHT + 0.012), Vector2(x + 0.07, ROAD_HEIGHT),
+		]), yellow_paint)
+
+	# When the primary track has elevated overpass sections (y > 1.8m), add concrete viaduct piers & Jersey barriers
+	var pier_mat := StandardMaterial3D.new()
+	pier_mat.albedo_color = Color(0.58, 0.60, 0.64)
+	pier_mat.roughness = 0.72
+	var po := 24.0
+	while po < track_length - 24.0:
+		var pxform := _track_transform(po, 0.0)
+		if pxform.origin.y > 1.8:
+			var ph: float = pxform.origin.y
+			_add_prop(Vector3(ROAD_HALF_WIDTH * 2.0 + 1.2, 0.85, 2.2), Vector3(pxform.origin.x, ph - 0.42, pxform.origin.z), pxform.basis, pier_mat)
+			for pside: float in [-1.0, 1.0]:
+				var col_pos: Vector3 = pxform.origin + pxform.basis.x * (pside * 7.8)
+				_add_prop(Vector3(1.6, ph, 1.8), Vector3(col_pos.x, ph * 0.5, col_pos.z), pxform.basis, pier_mat)
+		po += 28.0
+
+
+## Builds 3 physically drivable Multi-Level Overpasses and Alternate Routing Paths on every track:
+## 1. Sky-Expressway Multi-Level Overpass (inclined ramp climbing to y = 15.6m, crossing over the avenue with Jersey barriers & viaduct piers)
+## 2. High-Speed Hyper-Straight Bypass (chord-straightened outer high-velocity straightaway corridor)
+## 3. Inner Split-Route & Illuminated Cyber-Tunnel Gallery (covered neon tunnel chicane with overhead light ribs)
+func _build_alternate_routes_and_overpasses() -> void:
+	alternate_curves.clear()
+	if track_length < 600.0:
+		return
+
+	var asphalt := StandardMaterial3D.new()
+	asphalt.albedo_texture = load("res://textures/asphalt_track/asphalt_track_diff_2k.jpg")
+	asphalt.albedo_color = Color(0.68, 0.71, 0.76)
+	asphalt.normal_enabled = true
+	asphalt.normal_texture = load("res://textures/asphalt_track/asphalt_track_nor_gl_2k.jpg")
+	asphalt.normal_scale = 1.35
+	asphalt.roughness_texture = load("res://textures/asphalt_track/asphalt_track_rough_2k.jpg")
+	asphalt.roughness = 0.26
+	asphalt.metallic = 0.28
+	asphalt.clearcoat_enabled = true
+	asphalt.clearcoat = 0.48
+	asphalt.clearcoat_roughness = 0.12
+	asphalt.uv1_triplanar = true
+	asphalt.uv1_world_triplanar = true
+	asphalt.uv1_scale = Vector3.ONE * 0.5
+
+	var barrier_mat := StandardMaterial3D.new()
+	barrier_mat.albedo_texture = load("res://textures/city_pbr/concrete_wall_006_diff.jpg")
+	barrier_mat.albedo_color = Color(0.56, 0.58, 0.62)
+	barrier_mat.normal_enabled = true
+	barrier_mat.normal_texture = load("res://textures/city_pbr/concrete_wall_006_nor_gl.jpg")
+	barrier_mat.normal_scale = 1.25
+	barrier_mat.roughness = 0.68
+	barrier_mat.metallic = 0.15
+	barrier_mat.uv1_triplanar = true
+	barrier_mat.uv1_world_triplanar = true
+	barrier_mat.uv1_scale = Vector3.ONE * 0.25
+
+	var cyan_neon := StandardMaterial3D.new()
+	cyan_neon.albedo_color = Color(0.0, 0.92, 1.0)
+	cyan_neon.emission_enabled = true
+	cyan_neon.emission = Color(0.0, 0.92, 1.0)
+	cyan_neon.emission_energy_multiplier = 2.8
+
+	var amber_neon := StandardMaterial3D.new()
+	amber_neon.albedo_color = Color(1.0, 0.72, 0.08)
+	amber_neon.emission_enabled = true
+	amber_neon.emission = Color(1.0, 0.72, 0.08)
+	amber_neon.emission_energy_multiplier = 2.6
+
+	var magenta_neon := StandardMaterial3D.new()
+	magenta_neon.albedo_color = Color(1.0, 0.16, 0.72)
+	magenta_neon.emission_enabled = true
+	magenta_neon.emission = Color(1.0, 0.16, 0.72)
+	magenta_neon.emission_energy_multiplier = 2.8
+
+	# --- ROUTE 1: Multi-Level Sky-Expressway Overpass (Double-Decker Highway Viaduct climbing to y = 16.2m & sweeping across the boulevard) ---
+	var over_start: float = 132.0
+	var over_end: float = minf(740.0, track_length * 0.28)
+	var over_curve := Curve3D.new()
+	over_curve.bake_interval = 2.0
+	var circuit_pts := _sample_circuit_points(4.0)
+	var over_steps: int = 32
+	for i in over_steps + 1:
+		var t: float = float(i) / float(over_steps)
+		var o: float = lerpf(over_start, over_end, t)
+		var xf := _track_transform(o, 0.0)
+		var elev_env: float = smoothstep(0.0, 0.20, t) * (1.0 - smoothstep(0.80, 1.0, t))
+		var lat: float = 0.0
+		if t < 0.22:
+			# Inclined concrete viaduct on-ramp rising along the right side of the boulevard
+			lat = lerpf(-5.2, -8.8, smoothstep(0.0, 0.22, t))
+		elif t < 0.50:
+			# Upper-deck expressway sweeping diagonally across the boulevard canyon at y = 16.2m
+			lat = lerpf(-8.8, 7.2, smoothstep(0.22, 0.50, t))
+		elif t < 0.78:
+			# Sweeping out to the right-side elevated viaduct corridor past the harbor
+			lat = lerpf(7.2, -32.0, smoothstep(0.50, 0.78, t))
+		else:
+			lat = lerpf(-32.0, -5.2, smoothstep(0.78, 1.0, t))
+		var h: float = 16.2 * elev_env
+		var pt: Vector3 = xf.origin + xf.basis.x * lat + Vector3.UP * h
+		over_curve.add_point(_enforce_road_clearance(pt, circuit_pts))
+	_smooth_open_curve(over_curve)
+	alternate_curves.append(over_curve)
+	_build_branch_highway("SkyExpresswayOverpass", over_curve, 5.4, asphalt, barrier_mat, cyan_neon, true, false)
+	_build_route_portal_gantry(_track_transform(over_start + 6.0, 0.0), -5.8, "▲ SKY-EXPRESSWAY OVERPASS", cyan_neon, barrier_mat)
+
+	# --- ROUTE 2: High-Speed Outer Straightaway Bypass (Chord-straightened top-speed corridor) ---
+	var bypass_start: float = track_length * 0.35
+	var bypass_end: float = track_length * 0.58
+	var bypass_curve := Curve3D.new()
+	bypass_curve.bake_interval = 2.0
+	var p_entry := _track_transform(bypass_start, 0.0).origin
+	var p_exit := _track_transform(bypass_end, 0.0).origin
+	var bypass_steps: int = 24
+	for i in bypass_steps + 1:
+		var t: float = float(i) / float(bypass_steps)
+		var o: float = lerpf(bypass_start, bypass_end, t)
+		var xf := _track_transform(o, 0.0)
+		var branch_env: float = smoothstep(0.0, 0.16, t) * (1.0 - smoothstep(0.84, 1.0, t))
+		var curved_pt: Vector3 = xf.origin + xf.basis.x * (-36.0 * branch_env)
+		var chord_pt: Vector3 = p_entry.lerp(p_exit, t) + xf.basis.x * (-36.0 * branch_env)
+		var straight_blend: float = 0.68 * branch_env
+		var pt: Vector3 = curved_pt.lerp(chord_pt, straight_blend)
+		pt.y = maxf(0.0, pt.y)
+		bypass_curve.add_point(pt)
+	_smooth_open_curve(bypass_curve)
+	alternate_curves.append(bypass_curve)
+	_build_branch_highway("HyperStraightBypass", bypass_curve, 7.2, asphalt, barrier_mat, amber_neon, false, false)
+	_build_route_portal_gantry(_track_transform(bypass_start + 10.0, 0.0), -7.5, "► HYPER-STRAIGHT BYPASS", amber_neon, barrier_mat)
+
+	# --- ROUTE 3: Inner Split-Route & Illuminated Cyber-Tunnel Gallery ---
+	var split_start: float = track_length * 0.66
+	var split_end: float = track_length * 0.86
+	var split_curve := Curve3D.new()
+	split_curve.bake_interval = 2.0
+	var split_steps: int = 24
+	for i in split_steps + 1:
+		var t: float = float(i) / float(split_steps)
+		var o: float = lerpf(split_start, split_end, t)
+		var xf := _track_transform(o, 0.0)
+		var branch_env: float = smoothstep(0.0, 0.18, t) * (1.0 - smoothstep(0.82, 1.0, t))
+		var chicane_wave: float = sin(t * PI * 2.0) * 6.5 * branch_env
+		var lat: float = (32.0 + chicane_wave) * branch_env
+		var pt: Vector3 = xf.origin + xf.basis.x * lat
+		pt.y = maxf(0.0, pt.y)
+		split_curve.add_point(pt)
+	_smooth_open_curve(split_curve)
+	alternate_curves.append(split_curve)
+	_build_branch_highway("CyberTunnelSplitRoute", split_curve, 6.4, asphalt, barrier_mat, magenta_neon, false, true)
+	_build_route_portal_gantry(_track_transform(split_start + 10.0, 0.0), 7.5, "◄ NEON TUNNEL SPLIT-ROUTE", magenta_neon, barrier_mat)
+
+
+## Samples the main circuit's centreline every `step` metres (used for clearance checks).
+func _sample_circuit_points(step: float) -> PackedVector3Array:
+	var pts := PackedVector3Array()
+	var o := 0.0
+	while o < track_length:
+		pts.append(_track_point(o))
+		o += step
+	return pts
+
+
+## Raises an elevated-route sample to a safe clearance height if it passes over the
+## main circuit at traffic height. Keeps any viaduct from sitting in the car's path.
+const ROUTE_CLEARANCE_RADIUS := 14.0
+const ROUTE_CLEARANCE_HEIGHT := 8.5
+func _enforce_road_clearance(pt: Vector3, circuit_pts: PackedVector3Array) -> Vector3:
+	if pt.y >= ROUTE_CLEARANCE_HEIGHT:
+		return pt
+	for cp in circuit_pts:
+		if Vector2(cp.x - pt.x, cp.z - pt.z).length_squared() < ROUTE_CLEARANCE_RADIUS * ROUTE_CLEARANCE_RADIUS:
+			return Vector3(pt.x, ROUTE_CLEARANCE_HEIGHT, pt.z)
+	return pt
+
+
+func _smooth_open_curve(c: Curve3D) -> void:
+	var n := c.point_count
+	for i in n:
+		var p := c.get_point_position(i)
+		var prev := c.get_point_position(maxi(0, i - 1))
+		var next := c.get_point_position(mini(n - 1, i + 1))
+		var h := (next - prev) * 0.22
+		c.set_point_in(i, -h)
+		c.set_point_out(i, h)
+		_track_bounds_min = Vector2(minf(_track_bounds_min.x, p.x), minf(_track_bounds_min.y, p.z))
+		_track_bounds_max = Vector2(maxf(_track_bounds_max.x, p.x), maxf(_track_bounds_max.y, p.z))
+
+
+func _build_branch_highway(branch_name: String, branch_curve: Curve3D, half_w: float, asphalt: Material, barrier_mat: Material, neon_mat: Material, build_piers: bool, build_tunnel: bool) -> void:
+	var path_node := Path3D.new()
+	path_node.name = branch_name + "_Path"
+	path_node.curve = branch_curve
+	_track_root.add_child(path_node)
+
+	# Structural concrete viaduct box-girder deck + drivable asphalt surface
+	var deck := CSGPolygon3D.new()
+	deck.name = branch_name + "_Deck"
+	deck.polygon = PackedVector2Array([
+		Vector2(-half_w, -0.45), Vector2(-half_w, ROAD_HEIGHT + 0.02),
+		Vector2(half_w, ROAD_HEIGHT + 0.02), Vector2(half_w, -0.45),
+	])
+	deck.mode = CSGPolygon3D.MODE_PATH
+	deck.path_interval_type = CSGPolygon3D.PATH_INTERVAL_DISTANCE
+	deck.path_interval = 2.5
+	deck.path_rotation = CSGPolygon3D.PATH_ROTATION_PATH_FOLLOW
+	deck.path_joined = false
+	deck.smooth_faces = true
+	deck.use_collision = true
+	deck.material = asphalt
+	_track_root.add_child(deck)
+	deck.path_node = deck.get_path_to(path_node)
+
+	# Jersey barriers and LED strips only run where they can't block the main circuit: stretches that
+	# stay clear of the carriageway, or are elevated above traffic. The asphalt deck keeps full length.
+	var edge_curve := _trim_curve_clear_of_circuit(branch_curve, ROAD_HALF_WIDTH + 1.0, 3.0)
+	var edge_path := Path3D.new()
+	edge_path.name = branch_name + "_EdgePath"
+	edge_path.curve = edge_curve
+	_track_root.add_child(edge_path)
+
+	# Left & Right Concrete Jersey Crash Barriers + Glowing LED Guidance Strips
+	for side in [-1.0, 1.0]:
+		var bx: float = side * (half_w + 0.32)
+		var wall := CSGPolygon3D.new()
+		wall.name = "%s_Barrier_%s" % [branch_name, "L" if side > 0 else "R"]
+		var w_poly := PackedVector2Array([
+			Vector2(bx - 0.32, -0.45), Vector2(bx - 0.24, ROAD_HEIGHT + 1.05),
+			Vector2(bx + 0.24, ROAD_HEIGHT + 1.05), Vector2(bx + 0.32, -0.45),
+		])
+		wall.polygon = w_poly
+		wall.mode = CSGPolygon3D.MODE_PATH
+		wall.path_interval_type = CSGPolygon3D.PATH_INTERVAL_DISTANCE
+		wall.path_interval = 3.0
+		wall.path_rotation = CSGPolygon3D.PATH_ROTATION_PATH_FOLLOW
+		wall.path_joined = false
+		wall.smooth_faces = true
+		wall.use_collision = true
+		wall.material = barrier_mat
+		_track_root.add_child(wall)
+		wall.path_node = wall.get_path_to(edge_path)
+
+		var led := CSGPolygon3D.new()
+		var lx: float = side * (half_w - 0.02)
+		led.polygon = PackedVector2Array([
+			Vector2(lx - 0.08, ROAD_HEIGHT + 0.82), Vector2(lx - 0.08, ROAD_HEIGHT + 0.96),
+			Vector2(lx + 0.08, ROAD_HEIGHT + 0.96), Vector2(lx + 0.08, ROAD_HEIGHT + 0.82),
+		])
+		led.mode = CSGPolygon3D.MODE_PATH
+		led.path_interval_type = CSGPolygon3D.PATH_INTERVAL_DISTANCE
+		led.path_interval = 3.0
+		led.path_rotation = CSGPolygon3D.PATH_ROTATION_PATH_FOLLOW
+		led.path_joined = false
+		led.material = neon_mat
+		_track_root.add_child(led)
+		led.path_node = led.get_path_to(edge_path)
+
+	# Center highway dividing line along the branch
+	var yellow_paint := StandardMaterial3D.new()
+	yellow_paint.albedo_color = Color(0.98, 0.82, 0.12)
+	yellow_paint.roughness = 0.45
+	var center_line := CSGPolygon3D.new()
+	center_line.polygon = PackedVector2Array([
+		Vector2(-0.12, ROAD_HEIGHT + 0.02), Vector2(-0.12, ROAD_HEIGHT + 0.035),
+		Vector2(0.12, ROAD_HEIGHT + 0.035), Vector2(0.12, ROAD_HEIGHT + 0.02),
+	])
+	center_line.mode = CSGPolygon3D.MODE_PATH
+	center_line.path_interval_type = CSGPolygon3D.PATH_INTERVAL_DISTANCE
+	center_line.path_interval = 2.5
+	center_line.path_rotation = CSGPolygon3D.PATH_ROTATION_PATH_FOLLOW
+	center_line.path_joined = false
+	center_line.material = yellow_paint
+	_track_root.add_child(center_line)
+	center_line.path_node = center_line.get_path_to(path_node)
+
+	var blen: float = branch_curve.get_baked_length()
+	if build_piers:
+		var d: float = 28.0
+		while d < blen - 24.0:
+			var pt := branch_curve.sample_baked(d, true)
+			var dir := (branch_curve.sample_baked(minf(blen, d + 2.0), true) - branch_curve.sample_baked(maxf(0.0, d - 2.0), true)).normalized()
+			var b := Basis.looking_at(-dir, Vector3.UP)
+			if pt.y > 2.2:
+				# Check if pier column clears the primary ground road; if over the main road, use wide portal frame piers outside the road
+				var main_closest := _track_closest_point(pt.x, pt.z)
+				var dist_main := Vector2(main_closest.x - pt.x, main_closest.z - pt.z).length()
+				_add_prop(Vector3(half_w * 2.0 + 1.4, 0.85, 1.8), Vector3(pt.x, pt.y - 0.65, pt.z), b, barrier_mat)
+				if dist_main > ROAD_HALF_WIDTH + 2.5:
+					_add_prop(Vector3(1.5, pt.y, 1.8), Vector3(pt.x, pt.y * 0.5, pt.z), b, barrier_mat)
+			d += 30.0
+
+	if build_tunnel:
+		# Architectural Brutalist Concrete Cyber-Tunnel Gallery over the middle 60% of the split route
+		var td: float = blen * 0.20
+		while td < blen * 0.80:
+			var pt := branch_curve.sample_baked(td, true)
+			var dir := (branch_curve.sample_baked(minf(blen, td + 2.0), true) - branch_curve.sample_baked(maxf(0.0, td - 2.0), true)).normalized()
+			var b := Basis.looking_at(-dir, Vector3.UP)
+			var arch_h: float = 6.8
+			for side in [-1.0, 1.0]:
+				var wx: Vector3 = pt + b.x * (side * (half_w + 0.55)) + Vector3.UP * (arch_h * 0.5)
+				_add_prop(Vector3(0.75, arch_h, 4.2), wx, b, barrier_mat)
+			_add_prop(Vector3(half_w * 2.0 + 1.8, 0.75, 4.2), pt + Vector3.UP * arch_h, b, barrier_mat)
+			_add_prop(Vector3(half_w * 1.8, 0.16, 0.45), pt + Vector3.UP * (arch_h - 0.42), b, neon_mat)
+			td += 8.5
+
+
+## Returns the part of `c` that stays at least `clear` metres from the main circuit centreline, or is
+## at least `min_elev_y` metres high (elevated over traffic). Only the longest continuous run is kept, so
+## junction stubs that sit on the main road are dropped. Falls back to the full curve if nothing is left.
+func _trim_curve_clear_of_circuit(c: Curve3D, clear: float, min_elev_y: float) -> Curve3D:
+	var circuit := _sample_circuit_points(2.0)
+	var total := c.get_baked_length()
+	var samples: Array[Vector3] = []
+	var ok: Array[bool] = []
+	var s := 0.0
+	while s <= total:
+		var p := c.sample_baked(s)
+		var md := INF
+		if p.y < min_elev_y:
+			for cp in circuit:
+				var d := Vector2(cp.x - p.x, cp.z - p.z).length_squared()
+				if d < md:
+					md = d
+		samples.append(p)
+		ok.append(p.y >= min_elev_y or md >= clear * clear)
+		s += 2.0
+	var best_start := 0
+	var best_len := 0
+	var run_start := -1
+	for i in range(samples.size() + 1):
+		var good := i < samples.size() and ok[i]
+		if good and run_start < 0:
+			run_start = i
+		elif not good and run_start >= 0:
+			if i - run_start > best_len:
+				best_len = i - run_start
+				best_start = run_start
+			run_start = -1
+	var out := Curve3D.new()
+	out.bake_interval = 2.0
+	if best_len < 2:
+		return c
+	for i in range(best_start, best_start + best_len):
+		out.add_point(samples[i])
+	_smooth_open_curve(out)
+	return out
+
+
+func _build_route_portal_gantry(xform: Transform3D, lat_offset: float, title: String, neon_mat: Material, post_mat: Material) -> void:
+	var gh: float = 7.4
+	var post_dist: float = ROAD_HALF_WIDTH + 1.35 # 12.85m: safely planted on the sidewalk curb, 100% off the drivable road carriage
+	var span_width: float = post_dist * 2.0
+
+	# Two heavy structural viaduct/overhead gantry pillars grounded safely on the sidewalks
+	for side in [-1.0, 1.0]:
+		var post_pos: Vector3 = xform.origin + xform.basis.x * (side * post_dist) + Vector3.UP * (gh * 0.5)
+		_add_prop(Vector3(0.65, gh, 0.65), post_pos, xform.basis, post_mat)
+
+	# Continuous overhead truss spanning across the entire boulevard
+	var truss_pos: Vector3 = xform.origin + Vector3.UP * gh
+	_add_prop(Vector3(span_width + 0.8, 0.95, 0.55), truss_pos, xform.basis, post_mat)
+
+	# Illuminated route signage board positioned precisely over the target diverge lane with 6+ meters vertical clearance
+	var sign_w: float = 9.4
+	var sign_pos: Vector3 = xform.origin + xform.basis.x * lat_offset + Vector3.UP * (gh - 0.45)
+	_add_prop(Vector3(sign_w, 1.25, 0.38), sign_pos, xform.basis, post_mat)
+	_add_prop(Vector3(sign_w - 0.2, 0.14, 0.48), sign_pos + Vector3.UP * 0.68, xform.basis, neon_mat)
+
+	var lbl := Label3D.new()
+	lbl.text = title
+	lbl.font_size = 32
+	lbl.outline_size = 6
+	lbl.double_sided = true
+	lbl.modulate = Color(0.96, 0.98, 1.0)
+	lbl.outline_modulate = Color(0.02, 0.06, 0.12)
+	lbl.transform = Transform3D(xform.basis, sign_pos - xform.basis.z * 0.24)
+	_track_root.add_child(lbl)
 
 
 func _add_track_strip(polygon: PackedVector2Array, material: Material) -> CSGPolygon3D:
@@ -785,67 +1324,150 @@ func _add_track_strip(polygon: PackedVector2Array, material: Material) -> CSGPol
 
 
 func _build_start_line() -> void:
-	var line_xform := _track_transform(0.0, ROAD_HEIGHT + 0.015)
-	var checker := ShaderMaterial.new()
-	checker.shader = Shader.new()
-	checker.shader.code = CHECKER_SHADER
+	var line_xform := _track_transform(0.0, ROAD_HEIGHT + 0.005)
+
+	# High-detail checkered start/finish grid line across the roadway
+	var white_mat := StandardMaterial3D.new()
+	white_mat.albedo_color = Color(0.96, 0.96, 0.96)
+	white_mat.roughness = 0.45
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(ROAD_HALF_WIDTH * 2.0, 1.6)
-	plane.material = checker
+	plane.size = Vector2(ROAD_HALF_WIDTH * 2.0 - 0.4, 1.2)
+	plane.material = white_mat
 	var line := MeshInstance3D.new()
 	line.mesh = plane
 	line.transform = line_xform
 	_track_root.add_child(line)
 
-	var metal := StandardMaterial3D.new()
-	metal.albedo_color = Color(0.25, 0.26, 0.28)
-	metal.metallic = 0.8
-	metal.roughness = 0.4
-	var banner := StandardMaterial3D.new()
-	banner.albedo_color = Color(0.85, 0.1, 0.08)
-	banner.roughness = 0.5
+	# Start/Finish Overhead Arch Gantry (posts located safely on the sidewalks at ±12.85m)
+	var gantry_mat := StandardMaterial3D.new()
+	gantry_mat.albedo_color = Color(0.14, 0.16, 0.20)
+	gantry_mat.metallic = 0.82
+	gantry_mat.roughness = 0.28
+
+	var neon_cyan := StandardMaterial3D.new()
+	neon_cyan.albedo_color = Color(0.1, 0.95, 1.0)
+	neon_cyan.emission_enabled = true
+	neon_cyan.emission = Color(0.1, 0.95, 1.0)
+	neon_cyan.emission_energy_multiplier = 3.5
+
+	var post_dist: float = ROAD_HALF_WIDTH + 1.35
+	var gh: float = 7.5
 	for side in [-1.0, 1.0]:
-		_add_prop(Vector3(0.4, 7.0, 0.4), line_xform * Vector3(side * (ROAD_HALF_WIDTH + 2.0), 3.5, 0.0), line_xform.basis, metal)
-	_add_prop(Vector3(ROAD_HALF_WIDTH * 2.0 + 4.4, 1.4, 0.3), line_xform * Vector3(0.0, 6.6, 0.0), line_xform.basis, banner)
+		var post_pos: Vector3 = line_xform.origin + line_xform.basis.x * (side * post_dist) + Vector3.UP * (gh * 0.5)
+		_add_prop(Vector3(0.65, gh, 0.65), post_pos, line_xform.basis, gantry_mat)
+
+	var truss_pos: Vector3 = line_xform.origin + Vector3.UP * gh
+	_add_prop(Vector3(post_dist * 2.0 + 0.8, 1.0, 0.55), truss_pos, line_xform.basis, gantry_mat)
+	_add_prop(Vector3(post_dist * 2.0 + 0.4, 0.12, 0.6), truss_pos + Vector3.UP * 0.55, line_xform.basis, neon_cyan)
+
+	var start_lbl := Label3D.new()
+	start_lbl.text = "START  /  FINISH"
+	start_lbl.font_size = 36
+	start_lbl.outline_size = 6
+	start_lbl.double_sided = true
+	start_lbl.modulate = Color(0.96, 0.98, 1.0)
+	start_lbl.outline_modulate = Color(0.02, 0.06, 0.12)
+	start_lbl.transform = Transform3D(line_xform.basis, truss_pos - line_xform.basis.z * 0.3)
+	_track_root.add_child(start_lbl)
 
 
 func _build_road_details() -> void:
 	var corners := _find_corners()
 	_corners = corners
-	var paint := StandardMaterial3D.new()
-	paint.albedo_color = Color(0.92, 0.92, 0.9)
-	paint.roughness = 0.6
+	var white_paint := StandardMaterial3D.new()
+	white_paint.albedo_color = Color(0.95, 0.95, 0.93)
+	white_paint.roughness = 0.5
 
+	# Dashed white lane dividers between Lane 1-2 (-4.6m) and Lane 3-4 (+4.6m)
 	var dashes := SurfaceTool.new()
 	dashes.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var offset := 0.0
 	while offset + DASH_LENGTH < track_length:
-		_add_strip(dashes, offset, offset + DASH_LENGTH, -0.08, 0.08, ROAD_HEIGHT + 0.012, ROAD_HEIGHT + 0.012, Color.WHITE)
+		for lx: float in [-4.6, 4.6]:
+			_add_strip(dashes, offset, offset + DASH_LENGTH, lx - 0.09, lx + 0.09, ROAD_HEIGHT + 0.008, ROAD_HEIGHT + 0.008, Color.WHITE)
 		offset += DASH_LENGTH + DASH_GAP
-	_add_mesh(dashes, paint)
+	_add_mesh(dashes, white_paint)
 
-	# Red and white kerbs on both edges through every corner. They drape from the
-	# road edge over the shoulder, so the car just rolls across them.
-	var kerb_material := StandardMaterial3D.new()
-	kerb_material.vertex_color_use_as_albedo = true
-	kerb_material.roughness = 0.55
+	# Red and White Alternating Rumble Kerbs on Corner Apexes
 	var kerbs := SurfaceTool.new()
 	kerbs.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var kerb_mat := StandardMaterial3D.new()
+	kerb_mat.vertex_color_use_as_albedo = true
+	kerb_mat.roughness = 0.55
 	for corner in corners:
-		var stripe := 0
-		var o := corner.x
+		var side: float = corner.z
+		var in_edge: float = side * (ROAD_HALF_WIDTH - 1.25)
+		var out_edge: float = side * ROAD_HALF_WIDTH
+		var o: float = corner.x
+		var k_idx: int = 0
 		while o < corner.y:
-			var color := Color(0.62, 0.02, 0.02) if stripe % 2 == 0 else Color(0.92, 0.92, 0.9)
-			for side in [-1.0, 1.0]:
-				_add_strip(kerbs, o, o + KERB_SEGMENT, side * (ROAD_HALF_WIDTH - 0.3), side * (ROAD_HALF_WIDTH + 1.2), ROAD_HEIGHT + 0.03, 0.03, color)
-			o += KERB_SEGMENT
-			stripe += 1
-	_add_mesh(kerbs, kerb_material)
+			var next: float = minf(o + 1.2, corner.y)
+			var col: Color = Color(0.92, 0.15, 0.15) if (k_idx % 2 == 0) else Color(0.96, 0.96, 0.96)
+			_add_strip(kerbs, o, next, in_edge, out_edge, ROAD_HEIGHT + 0.012, ROAD_HEIGHT + 0.024, col)
+			k_idx += 1
+			o = next
+	_add_mesh(kerbs, kerb_mat)
 
+	# Guardrails on the outside of corners
 	_build_guardrails(corners)
 
 
-## Returns corners as Vector3(start offset, end offset, turn direction: +1 left, -1 right).
+## Dynamic Road Mechanics: Spawns RoadRepairController instances with Area3D triggers,
+## coroutines, and VehicleWheel3D traction modifiers.
+func _build_dynamic_road_repairs() -> void:
+	road_repair_zones.clear()
+	if track_length < 500.0:
+		return
+
+	# Place dynamic road repair zones at key points along the circuit
+	var repair_offsets := [
+		track_length * 0.18,
+		track_length * 0.72
+	]
+
+	for idx in repair_offsets.size():
+		var off: float = repair_offsets[idx]
+		var xform: Transform3D = _track_transform(off, ROAD_HEIGHT)
+		# Position repair zone neatly in the outer travel lane (-6.8m right / +6.8m left), leaving passing lanes open
+		var lane_lat: float = -6.8 if (idx % 2 == 0) else 6.8
+		var lane_xform := xform.translated_local(Vector3(lane_lat, 0.0, 0.0))
+		var zone: RoadRepairController = RoadRepairControllerScript.new()
+		zone.name = "RoadRepairZone_%d" % idx
+		zone.repair_duration = 3.2
+		zone.damaged_traction = 0.60
+		zone.fixed_traction = 1.00
+		zone.setup_procedural_visuals(Vector3(4.8, 3.5, 16.0))
+		zone.transform = lane_xform
+		_track_root.add_child(zone)
+		road_repair_zones.append(zone)
+
+		# Notification when road repair coroutine completes
+		zone.repair_completed.connect(func(_ctrl):
+			_show_message("Road Repair Complete: Full Traction Restored!", 3.0)
+		)
+
+
+func _trigger_nearest_road_repair() -> void:
+	if not car or road_repair_zones.is_empty():
+		return
+	var nearest_zone: RoadRepairController = null
+	var min_dist: float = 1e9
+	for zone in road_repair_zones:
+		if is_instance_valid(zone):
+			var d := car.global_position.distance_to(zone.global_position)
+			if d < min_dist:
+				min_dist = d
+				nearest_zone = zone
+	if nearest_zone:
+		if nearest_zone.current_state == RoadRepairController.RoadState.FIXED:
+			_show_message("Nearest road section is already in pristine condition!", 2.0)
+		elif nearest_zone.current_state == RoadRepairController.RoadState.REPAIRING:
+			_show_message("Road repair crew already dispatched on site!", 2.0)
+		else:
+			_show_message("Dispatching Road Repair Crew (Distance: %.0fm)..." % min_dist, 2.5)
+			nearest_zone.trigger_repair()
+
+
 func _find_corners() -> Array[Vector3]:
 	var corners: Array[Vector3] = []
 	var step := 2.0
@@ -995,13 +1617,16 @@ func _add_prop(size: Vector3, pos: Vector3, rot: Basis, material: Material) -> v
 func _build_checkpoints() -> void:
 	for i in CHECKPOINT_COUNT:
 		var area := Area3D.new()
+		area.name = "LapCheckpoint_%d" % i
 		area.monitorable = false
 		var shape := CollisionShape3D.new()
 		var box := BoxShape3D.new()
-		box.size = Vector3(ROAD_HALF_WIDTH * 2.0 + 16.0, 10.0, 3.0)
+		# Generously expanded checkpoint bounding box: 163m width and 52m vertical span so laps register
+		# flawlessly across main boulevard, elevated viaduct overpass (y=16.2m), and wide outer bypass corridors (±55m)
+		box.size = Vector3(ROAD_HALF_WIDTH * 2.0 + 140.0, 52.0, 6.0)
 		shape.shape = box
 		area.add_child(shape)
-		area.transform = _track_transform(track_length * i / CHECKPOINT_COUNT, 3.0)
+		area.transform = _track_transform(track_length * i / CHECKPOINT_COUNT, 10.0)
 		area.body_entered.connect(_on_checkpoint_entered.bind(i))
 		_track_root.add_child(area)
 
@@ -1109,8 +1734,8 @@ func _build_grass() -> void:
 			var lateral := lerpf(GRASS_BAND.x, GRASS_BAND.y, pow(rng.randf(), 1.6)) * side
 			var xform := _track_transform(offset, 0.0)
 			var pos := xform.origin + xform.basis.x * lateral
-			# Skip spots that land on another part of the track where it loops back.
-			if _distance_to_track(pos.x, pos.z) < GRASS_BAND.x:
+			# Strictly ensure NO grass can ever spawn on or near the highway or its shoulders
+			if _distance_to_track(pos.x, pos.z) < ROAD_HALF_WIDTH + 6.0:
 				continue
 			pos.y = _terrain_height(pos.x, pos.z)
 			var s := rng.randf_range(0.7, 1.4)
@@ -1226,7 +1851,8 @@ func _spawn_car() -> void:
 		if not is_player:
 			var driver := AIDriverScript.new()
 			racer.add_child(driver)
-			driver.setup(racer, self, OPPONENTS[i].skill, slot.y)
+			var route_choice := (i - 1) % 3
+			driver.setup(racer, self, OPPONENTS[i].skill, slot.y, route_choice)
 			ai_drivers.append(driver)
 		cars.append(racer)
 		progress[racer] = -slot.x
@@ -1247,15 +1873,35 @@ func _build_camera() -> void:
 func _update_camera(delta: float) -> void:
 	var looking_back := Input.is_action_pressed("look_back")
 	var behind := Basis.IDENTITY if looking_back else Basis(Vector3.UP, PI)
+
+	# Dynamic G-Force Inertia Rig
+	var lat_g: float = car.get("g_force_lateral") if (car and "g_force_lateral" in car) else 0.0
+	var lon_g: float = car.get("g_force_longitudinal") if (car and "g_force_longitudinal" in car) else 0.0
+	var target_head_pos := Vector3(
+		clampf(-lat_g * 0.045, -0.06, 0.06),
+		clampf(-absf(lat_g) * 0.015 - lon_g * 0.02, -0.04, 0.03),
+		clampf(lon_g * 0.05, -0.07, 0.07)
+	)
+	var target_head_rot := Vector3(
+		clampf(-lon_g * 0.04, -0.055, 0.055),
+		0.0,
+		clampf(lat_g * 0.042, -0.065, 0.065)
+	)
+	_head_inertia_pos = _head_inertia_pos.lerp(target_head_pos, delta * 12.0)
+	_head_inertia_rot = _head_inertia_rot.lerp(target_head_rot, delta * 12.0)
+
 	match CAMERA_VIEWS[camera_view].mode:
 		"bumper":
 			var z := -2.75 if looking_back else 2.6
-			camera.global_transform = car.global_transform * Transform3D(behind, Vector3(0.0, 0.75, z))
+			var bumper_pos := Vector3(0.0, 0.75, z) + Vector3(_head_inertia_pos.x * 0.3, _head_inertia_pos.y * 0.3, 0.0)
+			camera.global_transform = car.global_transform * Transform3D(behind, bumper_pos)
 			camera.fov = 78.0
 			_apply_camera_shake(delta)
 			return
 		"cockpit":
-			camera.global_transform = car.global_transform * Transform3D(behind, car.cockpit_offset())
+			var inertia_basis := Basis.from_euler(_head_inertia_rot)
+			var head_xform := Transform3D(behind * inertia_basis, car.cockpit_offset() + _head_inertia_pos)
+			camera.global_transform = car.global_transform * head_xform
 			camera.fov = 75.0
 			_apply_camera_shake(delta)
 			return
@@ -1282,6 +1928,7 @@ func _update_camera(delta: float) -> void:
 		target = hit.position + (pivot - target).normalized() * 0.4
 	camera.global_position = camera.global_position.lerp(target, 1.0 - exp(-delta * (20.0 if hit or looking_back else 7.0)))
 	camera.look_at(car.global_position + forward * 4.0 + Vector3.UP * 0.9, Vector3.UP)
+	camera.rotation.z = lerpf(camera.rotation.z, _head_inertia_rot.z * 0.45, delta * 10.0)
 	camera.fov = lerpf(camera.fov, 70.0 + clampf(speed * 0.35, 0.0, 16.0), 1.0 - exp(-delta * 3.0))
 	_apply_camera_shake(delta)
 
@@ -1345,14 +1992,21 @@ func _race_rank(racer: VehicleBody3D) -> float:
 	return progress[racer]
 
 
+var _last_grounded_offset: float = -1.0
+
 func _reset_car() -> void:
 	flipped_time = 0.0
-	var offset := curve.get_closest_offset(car.global_position)
+	var offset := _last_grounded_offset if _last_grounded_offset >= 0.0 else curve.get_closest_offset(car.global_position)
 	(car as CarScript).reset_to(_track_transform(offset, 0.8))
 
 
 func load_track(index: int) -> void:
 	current_track_index = posmod(index, TRACK_DATA.size())
+	var settings := ConfigFile.new()
+	settings.load("user://settings.cfg")
+	settings.set_value("race", "track", current_track_index)
+	settings.save("user://settings.cfg")
+
 	tree_instances.clear()
 	grass_instances.clear()
 
@@ -1365,19 +2019,18 @@ func load_track(index: int) -> void:
 	add_child(_track_root)
 
 	_build_track_curve()
-	_build_terrain()
 	_build_road()
+	_build_alternate_routes_and_overpasses()
 	_build_start_line()
 	_build_road_details()
+	_build_dynamic_road_repairs()
 	_build_checkpoints()
-	_build_trees()
-	_build_grass()
-	_build_rocks()
+	CityBuilderScript.build_city(self, _track_root)
 
 	apply_quality(current_quality_level)
 
 	if minimap_ctrl:
-		minimap_ctrl.setup(curve.get_baked_points(), car, Vector2(230.0, 230.0))
+		minimap_ctrl.setup(curve.get_baked_points(), car, Vector2(230.0, 230.0), alternate_curves)
 
 	_reset_race()
 	_show_message(TRACK_DATA[current_track_index].name, 3.5)
@@ -1395,6 +2048,10 @@ func _reset_race() -> void:
 	best_lap = INF
 	next_checkpoint = 0
 	flipped_time = 0.0
+	current_split_times = [0.0, 0.0, 0.0, 0.0]
+	best_split_times = [0.0, 0.0, 0.0, 0.0]
+	sector_delta_timer = 0.0
+	sector_delta_text = ""
 	for i in cars.size():
 		var racer := cars[i]
 		var slot: Vector2 = GRID[i]
@@ -1417,12 +2074,24 @@ func _on_checkpoint_entered(body: Node3D, index: int) -> void:
 		return
 	next_checkpoint = (index + 1) % CHECKPOINT_COUNT
 	if index != 0:
+		if lap_running and index < current_split_times.size():
+			current_split_times[index] = lap_time
+			if best_split_times[index] > 0.0:
+				var diff := lap_time - best_split_times[index]
+				if diff <= 0.0:
+					sector_delta_text = "-%.2fs" % absf(diff)
+					sector_delta_color = Color(0.2, 1.0, 0.3)
+				else:
+					sector_delta_text = "+%.2fs" % diff
+					sector_delta_color = Color(1.0, 0.3, 0.2)
+				sector_delta_timer = 3.0
 		return
 	if lap_running:
 		last_lap = lap_time
 		laps_done += 1
 		if lap_time < best_lap:
 			best_lap = lap_time
+			best_split_times = current_split_times.duplicate()
 			_show_message("New best lap!  " + _format_time(lap_time), 3.0)
 		else:
 			_show_message("Lap  " + _format_time(lap_time), 3.0)
@@ -1430,6 +2099,7 @@ func _on_checkpoint_entered(body: Node3D, index: int) -> void:
 		_show_message("Go!", 1.5)
 	lap_running = true
 	lap_time = 0.0
+	current_split_times = [0.0, 0.0, 0.0, 0.0]
 
 
 func _format_time(seconds: float) -> String:
@@ -1473,6 +2143,8 @@ func _build_hud() -> void:
 	fps_label = _make_label(timing, 18)
 	fps_label.visible = false
 	time_label = _make_label(timing, 26)
+	sector_delta_label = _make_label(timing, 24)
+	sector_delta_label.visible = false
 	last_label = _make_label(timing, 20)
 	best_label = _make_label(timing, 20)
 
@@ -1484,6 +2156,46 @@ func _build_hud() -> void:
 	gauges.offset_bottom = -24.0
 	gauges.alignment = BoxContainer.ALIGNMENT_END
 	layer.add_child(gauges)
+
+	# Live G-Force Friction Circle & Driver Assist Status Badges
+	var telem_row := HBoxContainer.new()
+	telem_row.alignment = BoxContainer.ALIGNMENT_END
+	telem_row.add_theme_constant_override("separation", 10)
+	gauges.add_child(telem_row)
+
+	var assist_box := VBoxContainer.new()
+	assist_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	assist_box.add_theme_constant_override("separation", 2)
+	telem_row.add_child(assist_box)
+
+	abs_indicator = Label.new()
+	abs_indicator.text = "ABS"
+	abs_indicator.add_theme_font_size_override("font_size", 14)
+	abs_indicator.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.9))
+	abs_indicator.add_theme_constant_override("outline_size", 3)
+	abs_indicator.add_theme_color_override("font_color", Color(0.35, 0.4, 0.45, 0.5))
+	assist_box.add_child(abs_indicator)
+
+	tcs_indicator = Label.new()
+	tcs_indicator.text = "TCS"
+	tcs_indicator.add_theme_font_size_override("font_size", 14)
+	tcs_indicator.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.9))
+	tcs_indicator.add_theme_constant_override("outline_size", 3)
+	tcs_indicator.add_theme_color_override("font_color", Color(0.35, 0.4, 0.45, 0.5))
+	assist_box.add_child(tcs_indicator)
+
+	g_force_val_label = Label.new()
+	g_force_val_label.text = "0.00 G"
+	g_force_val_label.add_theme_font_size_override("font_size", 13)
+	g_force_val_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.9))
+	g_force_val_label.add_theme_constant_override("outline_size", 3)
+	g_force_val_label.add_theme_color_override("font_color", Color(0.85, 0.9, 0.95, 0.85))
+	assist_box.add_child(g_force_val_label)
+
+	var g_widget := GMeterWidget.new()
+	g_widget.car = car
+	telem_row.add_child(g_widget)
+	g_meter_ctrl = g_widget
 
 	shift_light_bar = HBoxContainer.new()
 	shift_light_bar.alignment = BoxContainer.ALIGNMENT_END
@@ -1509,7 +2221,7 @@ func _build_hud() -> void:
 	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	var help := _make_label(layer, 15)
-	help.text = "W/S: drive    A/D: steer    Space: handbrake    R: reset    T: next track    C: camera    B: look back    H: headlights    V: photo mode    F: fps    Esc: menu"
+	help.text = "W/S: drive    A/D: steer    Space: handbrake    K: repair road    R: reset    T: next track    C: camera    B: look back    H: headlights    V: photo mode    F: fps    Esc: menu"
 	help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	help.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	help.offset_left = 28.0
@@ -1524,7 +2236,7 @@ func _build_hud() -> void:
 	minimap.offset_right = -24.0
 	minimap.offset_top = 20.0
 	minimap.offset_bottom = 250.0
-	minimap.setup(curve.get_baked_points(), car, Vector2(230.0, 230.0))
+	minimap.setup(curve.get_baked_points(), car, Vector2(230.0, 230.0), alternate_curves)
 	minimap.others = cars.filter(func(c): return c != car)
 
 

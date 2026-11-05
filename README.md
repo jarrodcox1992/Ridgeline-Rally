@@ -15,6 +15,7 @@ Open Godot, click **Import**, choose this folder's `project.godot`, then press *
 | Steer | A / D, Left / Right | Left stick |
 | Handbrake (drift) | Space | A |
 | Reset car to road | R | Y |
+| Repair road (dispatch crew) | K | X |
 | Next track (cycle circuits) | T | |
 | Switch camera (chase / far chase / bumper / cockpit) | C | Back |
 | Look back | B (hold) | Left shoulder |
@@ -26,12 +27,16 @@ Open Godot, click **Import**, choose this folder's `project.godot`, then press *
 
 ## Files
 
-- `main.gd` builds the world: terrain, road, trees, lighting, checkpoints, lap timing, camera and HUD. Multi-track layouts (Alpine Pass, Mount Akina Touge, Coastal Super-Speedway, Forest Grand Prix) with real 3D elevation and verticality are configured in `TRACK_DATA`.
-- `car.gd` handles car physics tuning and controls. It also loads the 3D model, attaches its wheels to the physics wheels, fixes materials, pitches the engine loop, and synthesizes the tire, wind and backfire sounds.
+- `main.gd` builds the world: road mesh, multi-level elevated viaducts, alternate bypass routes, checkpoints, lighting, camera, HUD, and 5 selectable circuits in `TRACK_DATA`.
+- `car.gd` handles car physics tuning, controls, and dynamic traction scaling via `road_traction_multiplier`.
+- `road_repair_controller.gd` dynamic road repair system with `Area3D` triggers, non-blocking async coroutines, `VehicleWheel3D` traction modifiers, and particle effects.
+- `city_builder.gd` constructs the multi-layer 3D metropolis, 3,800m `CityGroundMesh` with 2K PBR materials, street furniture, monorail, and skyline towers.
+- `living_city_controller.gd` controls dynamic urban ambient lighting, neon signage pulses, and audio.
 - `models/` holds the car model and its license.
 - `ai_driver.gd` drives the opponents: follows the track, brakes for corners ahead, and overtakes.
 - `tire_effects.gd` handles skid marks and tire smoke.
 - `exhaust.gd` builds the exhaust tips and their backfire flames, and triggers the crackle.
-- `pause_menu.gd` is the pause menu with AI difficulty, time of day and graphics settings, saved to `user://settings.cfg`.
-- `minimap.gd` draws the top-down track map with every car on it.
+- `pause_menu.gd` is the pause menu with track selector, AI difficulty, time of day and graphics settings.
+- `minimap.gd` draws the color-coded multi-route minimap with overpass (cyan), bypass (amber), and tunnel (magenta) indicators.
+- `city_visual_verification.md` detailed visual verification gallery with 10 rendered screenshot captures.
 - `ROADMAP.md` lists the improvements made so far.
