@@ -80,6 +80,9 @@ static var _rpm_walk_anim: Animation = null
 static var _rpm_bone_by_name: Dictionary = {}
 var _traffic_vehicles: Array[Dictionary] = []
 var _grid_traffic: Array[Dictionary] = []
+var _crowd_spots: Array[Dictionary] = []
+var _fx_root: Node3D
+const _CRASH_SPEED := 3.2
 var _traffic_signals: Array[Dictionary] = []
 var _horn_stream: AudioStreamWAV
 var _ped_persona_seq: int = 0
@@ -934,6 +937,216 @@ func honk_from(pos: Vector3) -> void:
 				hp.play()
 
 
+## ---------------------------------------------------------------------------
+## Crashes: driving into traffic shreds the car; driving into people splatters them.
+## ---------------------------------------------------------------------------
+func _ensure_fx_root() -> Node3D:
+	if not is_instance_valid(_fx_root):
+		_fx_root = Node3D.new()
+		_fx_root.name = "CrashFX"
+		main_node.add_child(_fx_root)
+	return _fx_root
+
+
+func register_crowd_spot(mm: MultiMesh, idx: int, pos: Vector3) -> void:
+	_crowd_spots.append({"mm": mm, "idx": idx, "pos": pos, "dead": false})
+
+
+func _update_crash_impacts(player_car: Node3D, delta: float) -> void:
+	if not is_instance_valid(player_car):
+		return
+	if not (player_car is RigidBody3D):
+		return
+	var vel: Vector3 = player_car.linear_velocity
+	if vel.length() < _CRASH_SPEED:
+		return
+	var ppos: Vector3 = player_car.global_position
+
+	# Traffic on the main ring road.
+	for veh in _traffic_vehicles:
+		if bool(veh.get("crashed", false)):
+			continue
+		var n: Node3D = veh.node
+		if not is_instance_valid(n):
+			continue
+		var to: Vector3 = n.global_position - ppos
+		if to.length_squared() < 7.3 and vel.dot(to) > 0.0:
+			veh["crashed"] = true
+			_explode_vehicle(n, vel)
+			player_car.linear_velocity = vel * 0.82
+
+	# Traffic on the city street grid.
+	for veh in _grid_traffic:
+		if bool(veh.get("crashed", false)):
+			continue
+		var n2: Node3D = veh.node
+		if not is_instance_valid(n2):
+			continue
+		var to2: Vector3 = n2.global_position - ppos
+		if to2.length_squared() < 7.3 and vel.dot(to2) > 0.0:
+			veh["crashed"] = true
+			_explode_vehicle(n2, vel)
+			player_car.linear_velocity = vel * 0.82
+
+	# Animated sidewalk walkers.
+	for ac in _animated_chars:
+		if bool(ac.get("dead", false)):
+			continue
+		var wn: Node3D = ac.node
+		if not is_instance_valid(wn):
+			continue
+		var to3: Vector3 = wn.global_position - ppos
+		if to3.length_squared() < 3.4:
+			ac["dead"] = true
+			_splatter(wn.global_position + Vector3.UP * 0.9, vel, wn)
+			player_car.linear_velocity = vel * 0.96
+
+	# Ambient crowd (instanced).
+	for spot in _crowd_spots:
+		if bool(spot.get("dead", false)):
+			continue
+		var to4: Vector3 = (spot.pos as Vector3) - ppos
+		if to4.length_squared() < 2.6:
+			spot["dead"] = true
+			var mm: MultiMesh = spot.mm
+			if is_instance_valid(mm) and int(spot.idx) < mm.instance_count:
+				mm.set_instance_transform(int(spot.idx), Transform3D(Basis().scaled(Vector3.ZERO), Vector3(0.0, -1000.0, 0.0)))
+			_splatter(spot.pos + Vector3.UP * 0.9, vel, null)
+			player_car.linear_velocity = vel * 0.97
+
+
+func _explode_vehicle(node: Node3D, vel: Vector3) -> void:
+	var pos: Vector3 = node.global_position + Vector3.UP * 0.8
+	node.visible = false
+	node.queue_free()
+
+	var metal := StandardMaterial3D.new()
+	metal.albedo_color = Color(0.12, 0.12, 0.14)
+	metal.metallic = 0.85
+	metal.roughness = 0.38
+	for i in 14:
+		_debris_piece(pos, vel, metal, randf_range(0.22, 0.55), true)
+
+	# Fireball, smoke and a flash.
+	_burst(pos, Color(1.0, 0.55, 0.12), 60, 5.0, 14.0, 0.9, -7.0, 0.55)
+	_burst(pos + Vector3.UP * 0.6, Color(0.25, 0.25, 0.27), 34, 2.0, 6.0, 2.4, 1.2, 0.9)
+	_flash(pos, Color(1.0, 0.6, 0.2), 11.0, 22.0)
+	_sound(pos, "res://sounds/impact_heavy.wav", 30.0, 120.0, 0.0)
+
+
+func _splatter(pos: Vector3, vel: Vector3, node: Node3D) -> void:
+	if is_instance_valid(node):
+		node.visible = false
+		node.queue_free()
+
+	var flesh := StandardMaterial3D.new()
+	flesh.albedo_color = Color(0.42, 0.02, 0.03)
+	flesh.roughness = 0.85
+	for i in 7:
+		_debris_piece(pos, vel, flesh, randf_range(0.06, 0.14), false)
+	_burst(pos, Color(0.55, 0.02, 0.03), 46, 3.0, 9.0, 0.75, -18.0, 0.16)
+	_splat_decal(pos, vel)
+	_sound(pos, "res://sounds/impact_thud.wav", 18.0, 60.0, -3.0)
+
+
+func _debris_piece(pos: Vector3, vel: Vector3, mat: Material, size: float, metallic: bool) -> void:
+	var body := RigidBody3D.new()
+	body.mass = 0.6 if metallic else 0.3
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(size, size * 0.55, size * 1.5)
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	body.add_child(mi)
+	var cs := CollisionShape3D.new()
+	var sh := BoxShape3D.new()
+	sh.size = mesh.size
+	cs.shape = sh
+	body.add_child(cs)
+	var outward := Vector3(randf_range(-1.0, 1.0), randf_range(0.2, 1.0), randf_range(-1.0, 1.0)).normalized()
+	body.position = pos + Vector3(randf_range(-0.4, 0.4), randf_range(0.0, 0.5), randf_range(-0.4, 0.4))
+	body.linear_velocity = vel * 0.3 + outward * randf_range(3.0, 9.0) + Vector3.UP * randf_range(1.5, 5.0)
+	body.angular_velocity = Vector3(randf_range(-8.0, 8.0), randf_range(-8.0, 8.0), randf_range(-8.0, 8.0))
+	_ensure_fx_root().add_child(body)
+	get_tree().create_timer(6.0).timeout.connect(body.queue_free)
+
+
+func _burst(pos: Vector3, color: Color, amount: int, vmin: float, vmax: float, life: float, grav: float, size: float) -> void:
+	var p := CPUParticles3D.new()
+	p.amount = amount
+	p.lifetime = life
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.emitting = true
+	p.direction = Vector3.UP
+	p.spread = 180.0
+	p.initial_velocity_min = vmin
+	p.initial_velocity_max = vmax
+	p.gravity = Vector3(0.0, grav, 0.0)
+	p.scale_amount_min = size * 0.5
+	p.scale_amount_max = size
+	p.color = color
+	var ramp := Gradient.new()
+	ramp.set_color(0, color)
+	ramp.set_color(1, Color(color.r * 0.15, color.g * 0.15, color.b * 0.15, 0.0))
+	p.color_ramp = ramp
+	var q := QuadMesh.new()
+	q.size = Vector2(size, size)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.vertex_color_use_as_albedo = true
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	q.material = m
+	p.mesh = q
+	p.position = pos
+	_ensure_fx_root().add_child(p)
+	get_tree().create_timer(life + 0.7).timeout.connect(p.queue_free)
+
+
+func _flash(pos: Vector3, color: Color, energy: float, radius: float) -> void:
+	var light := OmniLight3D.new()
+	light.light_color = color
+	light.light_energy = energy
+	light.omni_range = radius
+	light.position = pos + Vector3.UP * 1.2
+	_ensure_fx_root().add_child(light)
+	var tw := create_tween()
+	tw.tween_property(light, "light_energy", 0.0, 0.5)
+	tw.tween_callback(light.queue_free)
+
+
+func _splat_decal(pos: Vector3, vel: Vector3) -> void:
+	var decal := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = randf_range(0.35, 0.6)
+	cyl.bottom_radius = cyl.top_radius
+	cyl.height = 0.012
+	cyl.radial_segments = 10
+	decal.mesh = cyl
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.32, 0.015, 0.02)
+	m.roughness = 0.55
+	decal.material_override = m
+	var ground_y: float = maxf(0.205, pos.y - 0.88)
+	decal.position = Vector3(pos.x, ground_y + 0.008, pos.z)
+	decal.scale = Vector3(1.0, 1.0, 0.8)
+	_ensure_fx_root().add_child(decal)
+	get_tree().create_timer(25.0).timeout.connect(decal.queue_free)
+
+
+func _sound(pos: Vector3, path: String, unit: float, max_dist: float, db: float) -> void:
+	var player := AudioStreamPlayer3D.new()
+	player.stream = load(path)
+	player.unit_size = unit
+	player.max_distance = max_dist
+	player.volume_db = db
+	player.position = pos
+	_ensure_fx_root().add_child(player)
+	player.play()
+	get_tree().create_timer(3.5).timeout.connect(player.queue_free)
+
+
 func _process(delta: float) -> void:
 	if not is_instance_valid(main_node):
 		return
@@ -942,6 +1155,8 @@ func _process(delta: float) -> void:
 	var player_car: Node3D = main_node.get("car")
 	var player_pos: Vector3 = player_car.global_position if is_instance_valid(player_car) else Vector3.ZERO
 	var cam: Camera3D = main_node.get("camera")
+
+	_update_crash_impacts(player_car, delta)
 
 	# 1. District Synth Modulation
 	if is_instance_valid(_synth_player) and is_instance_valid(player_car):

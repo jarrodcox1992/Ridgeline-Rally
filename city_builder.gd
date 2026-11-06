@@ -316,7 +316,7 @@ static func build_city(main: Node, track_root: Node3D) -> void:
 	_build_urban_soundscapes(main, track_root)
 	_build_city_street_grid(main, track_root, rng)
 	_build_grid_traffic(track_root, living_ctrl, rng)
-	_build_dense_crowd(main, track_root, rng)
+	_build_dense_crowd(main, track_root, rng, living_ctrl)
 	_build_animated_characters(main, track_root, living_ctrl, rng)
 	_purge_carriageway_intrusions(main, track_root)
 	print("CityBuilder: Neo-Veridia // Sector-9 Cyberpunk Metropolis fully operational!")
@@ -2482,7 +2482,7 @@ static func _build_crowd_mesh(radius: float, height: float, head_r: float) -> Ar
 	return st.commit()
 
 
-static func _build_dense_crowd(main: Node, track_root: Node3D, rng: RandomNumberGenerator) -> void:
+static func _build_dense_crowd(main: Node, track_root: Node3D, rng: RandomNumberGenerator, living_ctrl: Node) -> void:
 	if not main.has_method("_track_transform"):
 		return
 	var track_len: float = float(main.get("track_length"))
@@ -2579,6 +2579,8 @@ static func _build_dense_crowd(main: Node, track_root: Node3D, rng: RandomNumber
 				var sc: float = rng.randf_range(0.92, 1.08) * mesh_scale
 				var basis := Basis(Vector3.UP, yaw).scaled(Vector3(sc, sc, sc))
 				mm.set_instance_transform(idx, Transform3D(basis, pos))
+				if living_ctrl != null and living_ctrl.has_method("register_crowd_spot"):
+					living_ctrl.call("register_crowd_spot", mm, idx, pos)
 				total += 1
 				idx += 1
 		# Hide any unused instances.

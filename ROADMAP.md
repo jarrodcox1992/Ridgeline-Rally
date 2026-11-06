@@ -98,6 +98,7 @@ Found by driving the race through scripted runs, then fixed:
 
 - There is now a single map (`Neo-Veridia`). The T-key track cycling and the pause-menu Track selector are gone.
 - A 14-street grid of flat asphalt roads with collision is laid across the map, buildings on those roads are cleared, and the ring circuit remains the race course. Cars can cross the kerb to roam the grid.
+- Crash destruction: hitting traffic shreds the car into physics debris with fire, smoke and a flash; hitting people bursts them into red particles, chunks and a ground splat.
 - 36 HD taxis and kei trucks cruise the grid lines (two-way lanes, wrapping at the map edge), facing their direction of travel.
 
 ## Track 4 redesign
