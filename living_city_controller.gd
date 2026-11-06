@@ -79,6 +79,7 @@ var _animated_chars: Array[Dictionary] = []
 static var _rpm_walk_anim: Animation = null
 static var _rpm_bone_by_name: Dictionary = {}
 var _traffic_vehicles: Array[Dictionary] = []
+var _grid_traffic: Array[Dictionary] = []
 var _traffic_signals: Array[Dictionary] = []
 var _horn_stream: AudioStreamWAV
 var _ped_persona_seq: int = 0
@@ -843,6 +844,19 @@ func register_traffic_vehicle(node: Node3D, offset: float, lat: float, speed: fl
 	})
 
 
+## A car cruising one of the city street-grid lines (not the main circuit).
+func register_grid_vehicle(node: Node3D, axis: int, street_coord: float, t: float, lane: float, speed: float, dir: float) -> void:
+	_grid_traffic.append({
+		"node": node,
+		"axis": axis,           # 0 = east-west (along X), 1 = north-south (along Z)
+		"street_coord": street_coord,
+		"t": t,
+		"lane": lane,
+		"speed": speed,
+		"dir": dir,
+	})
+
+
 func register_traffic_signal(offset: float, signal_light: OmniLight3D, phase_offset: float) -> void:
 	_traffic_signals.append({
 		"offset": offset,
@@ -1046,6 +1060,26 @@ func _process(delta: float) -> void:
 		var heading_deg: float = float(veh.rot_fix) + (0.0 if dir > 0.0 else 180.0)
 		var b: Basis = xform.basis.rotated(xform.basis.y.normalized(), deg_to_rad(heading_deg)).scaled(Vector3(sc, sc, sc))
 		node.transform = Transform3D(b, world_pos)
+
+	# 4b. City-grid traffic: cars cruising the street grid laid across the one map.
+	for veh in _grid_traffic:
+		var gnode: Node3D = veh.node
+		if not is_instance_valid(gnode):
+			continue
+		var axis: int = int(veh.axis)
+		var extent := 900.0
+		var gt: float = float(veh.t) + float(veh.speed) * float(veh.dir) * delta
+		if gt > extent:
+			gt -= extent * 2.0
+		elif gt < -extent:
+			gt += extent * 2.0
+		veh.t = gt
+		var forward := Vector3.RIGHT if axis == 0 else Vector3.BACK
+		var side := Vector3.BACK if axis == 0 else Vector3.RIGHT
+		var pos: Vector3 = forward * gt + side * (float(veh.street_coord) + float(veh.lane))
+		pos.y = 0.20
+		var gb := Basis.looking_at(-forward * float(veh.dir), Vector3.UP) # model front is +Z
+		gnode.global_transform = Transform3D(gb, pos)
 
 	# 5. Animate Citizen AI & Character Ecosystem (Commuters, Skybridge Walkers, Vendors, Drifters)
 	for cit in _citizens:

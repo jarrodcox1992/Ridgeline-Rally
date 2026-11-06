@@ -315,6 +315,7 @@ static func build_city(main: Node, track_root: Node3D) -> void:
 	_build_neon_billboards(main, track_root, rng, living_ctrl)
 	_build_urban_soundscapes(main, track_root)
 	_build_city_street_grid(main, track_root, rng)
+	_build_grid_traffic(track_root, living_ctrl, rng)
 	_build_dense_crowd(main, track_root, rng)
 	_build_animated_characters(main, track_root, living_ctrl, rng)
 	_purge_carriageway_intrusions(main, track_root)
@@ -2341,6 +2342,27 @@ static func _add_street_line(track_root: Node3D, pos: Vector3, size: Vector3, ma
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.position = pos
 	track_root.add_child(mi)
+
+
+## Cars cruising the city street grid so the extra roads feel like real city streets.
+static func _build_grid_traffic(track_root: Node3D, living_ctrl: Node, rng: RandomNumberGenerator) -> void:
+	if living_ctrl == null or not living_ctrl.has_method("register_grid_vehicle"):
+		return
+	var coords := [-640.0, -380.0, -120.0, 140.0, 400.0, 660.0]
+	var spawned := 0
+	for axis in [0, 1]:
+		for c in coords:
+			for k in 3:
+				var use_taxi := rng.randf() < 0.7
+				var inst: Node3D = (HD_TAXI if use_taxi else HD_KEI_TRUCK).instantiate()
+				inst = living_ctrl.call("normalize_and_ground_instance", inst, 4.6 if use_taxi else 4.3, 0.0)
+				track_root.add_child(inst)
+				var dir := 1.0 if rng.randf() < 0.5 else -1.0
+				var lane := -3.2 if dir > 0.0 else 3.2
+				var t := rng.randf_range(-860.0, 860.0)
+				living_ctrl.call("register_grid_vehicle", inst, axis, c, t, lane, rng.randf_range(9.0, 13.5), dir)
+				spawned += 1
+	print("CityBuilder: %d cars cruising the city grid" % spawned)
 
 
 static func _purge_buildings_on_streets(track_root: Node3D, rects: Array[AABB]) -> void:

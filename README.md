@@ -33,6 +33,7 @@ Every rival and every person on the street has their own character.
 - **Pedestrians:** timid (jumps clear early), curious (leans out to watch), oblivious (keeps walking), friendly (stops to wave you through).
 - **Traffic:** polite (eases over to let you past), aggressive (speeds up and honks), tourist (slow drifters), courier (weaving scooters).
 - **Realistic people:** 160 fully animated Ready Player Me men and women walk the sidewalks in a retargeted walk cycle, alongside 1,200 textured people in the ambient crowd.
+- **City-grid traffic:** taxis and kei trucks cruise the street grid, so the extra roads are alive too.
 - **The crowd:** about 1,200 extra people fill the sidewalks and plazas, gathered in small groups — queues at bus stops, friends in plazas, onlookers at the kerb. Each group has a personality that decides where they stand.
 - Press **G** / gamepad **B** to sound the horn: nearby pedestrians react by personality and traffic honks back.
 
