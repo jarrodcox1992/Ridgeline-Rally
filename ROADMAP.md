@@ -94,9 +94,10 @@ Found by driving the race through scripted runs, then fixed:
 
 
 
+## Track 4 redesign
+
+- Track 4 now uses a smooth, flat, procedural loop (no alternate routes or guardrails) instead of the surveyed Alpine autobahn data. It completes a lap in the automated drive test at ~150 km/h and is playable.
+
 ## Known issues
 
-- **Track 4 (Sector-9 Autobahn A-95) is hidden from the track list until it is fixed.** It is not drivable end to end. The autopilot stalls at the start: the elevated loop crosses over the start straight with its road slab about 1.55 m above the ground, lower than the car's roof. Raising that crossing clears the start but exposes a second stall on the elevated section near 4100 m. Fix by redesigning the track's elevation (move the crossing off the start straight, or lower the loop there). Track 0 (Neo-Veridia) completes a lap.
 - Track 0 can occasionally leave the car wedged against a sidewalk prop. The game now shows a "Stuck? Press R to reset" hint after 3 seconds stopped off the road; the drive test resets the car automatically and continues.
-- **Track 4 redesign in progress.** The config is now a clean main loop: flat, no alternate routes, Chaikin-smoothed corners. It completes most of a lap at about 150 km/h, but still stalls at guardrail and corner edges in the autopilot test, so it stays hidden until a full lap passes with no stalls.
-
