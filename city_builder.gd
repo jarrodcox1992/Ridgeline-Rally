@@ -72,6 +72,7 @@ const PH_METAL_TRASHCAN := preload("res://models/polyhaven/metal_trash_can/metal
 const PH_TRASHBAG := preload("res://models/polyhaven/trashbag/trashbag.gltf")
 const PH_AIRCON_UNIT := preload("res://models/polyhaven/exterior_aircon_unit/exterior_aircon_unit.gltf")
 const PH_CARDBOARD_BOX := preload("res://models/polyhaven/cardboard_box_01/cardboard_box_01.gltf")
+const PH_WOODEN_BARRELS := preload("res://models/polyhaven/wooden_barrels_01/wooden_barrels_01_2k.gltf")
 
 # High-Detail City 3D Models (GLB)
 const HD_BUS_STOP := preload("res://models/city_hd/kyoto_cityscene_bus_stop.glb")
@@ -668,6 +669,8 @@ static func _build_boulevard_frontage(main: Node, track_root: Node3D, rng: Rando
 				_spawn_model(track_root, MODEL_DUMPSTER_OPEN if is_open else MODEL_DUMPSTER, axform, Vector3(alley_lat, alley_sw_h, 0.0), 2.5, 90.0 if aside < 0 else -90.0)
 				_spawn_model(track_root, PH_METAL_TRASHCAN, axform, Vector3(alley_lat, alley_sw_h, -1.8), 1.0, 90.0 if aside < 0 else -90.0)
 				_spawn_model(track_root, PH_TRASHBAG, axform, Vector3(alley_lat - aside * 0.7, alley_sw_h, -1.2), 1.0, rng.randf_range(0.0, 360.0))
+				if int(alley_o) % 3 == 0:
+					_spawn_model(track_root, PH_WOODEN_BARRELS, axform, Vector3(alley_lat + aside * 0.4, alley_sw_h, 1.6), 1.0, rng.randf_range(0.0, 360.0))
 				
 				# 3-High Stack of GMA Wooden Transport Pallets
 				for pi in 3:

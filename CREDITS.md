@@ -49,6 +49,10 @@ All from [Poly Haven](https://polyhaven.com/textures), CC0 (public domain):
 
 "Rock Moss Set 01" and "Boulder 01" from [Poly Haven](https://polyhaven.com/models), CC0 (public domain).
 
+## Street props
+
+"Wooden Barrels 01" from [Poly Haven](https://polyhaven.com/a/wooden_barrels_01), CC0 (public domain). Used as alley clutter.
+
 ## Audio & Sound Effects
 
 - **Engine Loops (Multi-RPM Crossfading):** "Racing car engine sound loops" by domasx2, from [OpenGameArt](https://opengameart.org/content/racing-car-engine-sound-loops), CC0 (public domain). Features 6 distinct loops (`engine_loop_0.wav` through `engine_loop_5.wav`) seamlessly crossfaded across 900 to 7,200+ RPM.
