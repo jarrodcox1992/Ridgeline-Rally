@@ -61,14 +61,16 @@ const CITY_TRACKS: Array[Dictionary] = [
 		"speed_limit": "60 MPH",
 	},
 	{
-		"hidden": true, # Not drivable end to end yet; see ROADMAP known issues.
+		"hidden": true, # Set to false once the clean loop passes the drive test (see ROADMAP known issues).
 		"name": "Sector-9 Autobahn A-95",
-		"desc": "Massive 1.76 km Span Ultra-High-Speed Perimeter Highway with Long Straightaways & Elevated Viaducts",
+		"desc": "Massive 1.76 km Span Ultra-High-Speed Perimeter Highway with Long Straightaways & Smoothed Clean Loop",
 		"file": "res://tracks/AutobahnA95.csv",
 		"span": 1760.0,
 		"step": 3,
-		"elev_amp": 18.0,
-		"elev_type": "multi_overpass",
+		"smooth": 3,
+		"branches": false,
+		"elev_amp": 0.0,
+		"elev_type": "flat",
 		"district": "SECTOR-9 // PERIMETER AUTOBAHN",
 		"road_title": "AUTOBAHN A-95 EXPRESS",
 		"speed_limit": "UNLIMITED",
@@ -441,6 +443,7 @@ func _init_tracks() -> void:
 			"district": circuit.get("district", "METROPOLIS"),
 			"road_title": circuit.get("road_title", circuit.name),
 			"speed_limit": circuit.get("speed_limit", "45 MPH"),
+			"branches": circuit.get("branches", true),
 		})
 
 
@@ -460,6 +463,18 @@ func _load_osm_track(path: String, cfg: Dictionary) -> Array[Vector3]:
 
 	if pts.is_empty():
 		return []
+
+	# Chaikin corner cutting: each pass replaces every corner with two points at 1/4 and 3/4 along its edges,
+	# giving smooth, drivable turns while keeping the overall shape of the surveyed road.
+	for _it in int(cfg.get("smooth", 0)):
+		var smoothed: Array[Vector2] = []
+		var m := pts.size()
+		for i in m:
+			var a := pts[i]
+			var b := pts[(i + 1) % m]
+			smoothed.append(a.lerp(b, 0.25))
+			smoothed.append(a.lerp(b, 0.75))
+		pts = smoothed
 
 	var step: int = int(cfg.get("step", 3))
 	var min_p := Vector2(1e9, 1e9)
@@ -969,6 +984,8 @@ func _build_road() -> void:
 func _build_alternate_routes_and_overpasses() -> void:
 	alternate_curves.clear()
 	if track_length < 600.0:
+		return
+	if current_track_index < TRACK_DATA.size() and not TRACK_DATA[current_track_index].get("branches", true):
 		return
 
 	var asphalt := StandardMaterial3D.new()
