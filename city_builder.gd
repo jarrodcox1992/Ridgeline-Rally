@@ -255,6 +255,26 @@ static func _spawn_model(track_root: Node3D, scene: PackedScene, xform: Transfor
 	return null
 
 
+## Batches many identical boxes into one draw call (used for rooftops and grid furniture).
+static func _add_multimesh_boxes(track_root: Node3D, xforms: Array[Transform3D], mat: Material, node_name: String) -> void:
+	if xforms.is_empty():
+		return
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3.ONE
+	mesh.material = mat
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = mesh
+	mm.instance_count = xforms.size()
+	for i in xforms.size():
+		mm.set_instance_transform(i, xforms[i])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = node_name
+	mmi.multimesh = mm
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	track_root.add_child(mmi)
+
+
 static func _make_pbr_concrete(tint: Color, rough: float = 0.65, metal: float = 0.16, uv_scale: float = 0.24) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = tint
@@ -1197,6 +1217,10 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 	
 	var placed_aabbs: Array[AABB] = []
 	var bg_count: int = 0
+	var bg_exo_shared := _make_pbr_concrete(Color(0.56, 0.54, 0.50), 0.56, 0.18)
+	var roof_caps: Array[Transform3D] = []
+	var roof_units: Array[Transform3D] = []
+	var roof_masts: Array[Transform3D] = []
 	var h_pos_1: Vector3 = (main.call("_track_transform", 185.0, 0.0) as Transform3D) * Vector3(-50.0, 0.0, 0.0)
 	var h_pos_2: Vector3 = (main.call("_track_transform", 2300.0, 0.0) as Transform3D) * Vector3(-50.0, 0.0, 0.0)
 	
@@ -1235,7 +1259,7 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 			placed_aabbs.append(candidate_aabb)
 			
 			var chosen_mat: ShaderMaterial = glass_materials[rng.randi() % glass_materials.size()]
-			var bg_exo := _make_pbr_concrete(Color(0.56, 0.54, 0.50), 0.56, 0.18)
+			var bg_exo := bg_exo_shared
 			var base_h: float = bh * 0.72 if bh > 75.0 else bh
 			var mesh := BoxMesh.new()
 			mesh.size = Vector3(bw, base_h, bd)
@@ -1304,12 +1328,23 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 			body.position = Vector3(bx, bh * 0.5, bz)
 			track_root.add_child(body)
 			
+			# Finished roofscape: parapet cap + plant units + masts, so no tower is a bare box.
+			if bh <= 75.0:
+				roof_caps.append(Transform3D(Basis().scaled(Vector3(bw + 1.2, 0.9, bd + 1.2)), Vector3(bx, bh + 0.45, bz)))
+				if rng.randf() < 0.55:
+					roof_units.append(Transform3D(Basis().scaled(Vector3(3.4, 2.1, 2.6)), Vector3(bx + rng.randf_range(-bw * 0.24, bw * 0.24), bh + 1.05, bz + rng.randf_range(-bd * 0.24, bd * 0.24))))
+				if rng.randf() < 0.22:
+					var mh := rng.randf_range(6.0, 12.0)
+					roof_masts.append(Transform3D(Basis().scaled(Vector3(0.3, mh, 0.3)), Vector3(bx + bw * 0.3, bh + 0.45 + mh * 0.5, bz - bd * 0.3)))
 			if rng.randf() < 0.40:
 				_spawn_model(track_root, MODEL_WATER_TANK, Transform3D(Basis.IDENTITY, Vector3(bx, bh + 2.28, bz)), Vector3.ZERO, 5.5)
 			elif rng.randf() < 0.35:
 				_spawn_model(track_root, MODEL_ANTENNA_DISH, Transform3D(Basis.IDENTITY, Vector3(bx, bh + 1.15, bz)), Vector3.ZERO, 3.2, 45.0)
 				
 			bg_count += 1
+	_add_multimesh_boxes(track_root, roof_caps, bg_exo_shared, "BG_RoofCaps")
+	_add_multimesh_boxes(track_root, roof_units, _make_pbr_metal(Color(0.42, 0.44, 0.47), 0.35, 0.8), "BG_RoofPlant")
+	_add_multimesh_boxes(track_root, roof_masts, _make_pbr_metal(Color(0.25, 0.27, 0.30), 0.3, 0.9), "BG_RoofMasts")
 	print("CityBuilder: Constructed %d non-overlapping background skyline towers." % bg_count)
 
 
@@ -2417,6 +2452,8 @@ static func _build_city_street_grid(main: Node, track_root: Node3D, rng: RandomN
 	var extent := 900.0
 	var step := 260.0
 	var rects: Array[AABB] = []
+	var z_lines: Array[float] = []
+	var x_lines: Array[float] = []
 
 	# East-west streets.
 	var z: float = -extent
@@ -2426,6 +2463,7 @@ static func _build_city_street_grid(main: Node, track_root: Node3D, rng: RandomN
 		main.call("_add_prop", Vector3(length_x, thick, width), pos, Basis(), mat)
 		_add_street_line(track_root, Vector3(0.0, thick + 0.005, z), Vector3(length_x, 0.02, 0.5), line_mat)
 		rects.append(AABB(Vector3(-extent, 0.0, z - width * 0.5 - 11.0), Vector3(length_x, 6.0, width + 22.0)))
+		z_lines.append(z)
 		z += step
 
 	# North-south streets.
@@ -2436,10 +2474,202 @@ static func _build_city_street_grid(main: Node, track_root: Node3D, rng: RandomN
 		main.call("_add_prop", Vector3(width, thick, length_z), pos2, Basis(), mat)
 		_add_street_line(track_root, Vector3(x, thick + 0.005, 0.0), Vector3(0.5, 0.02, length_z), line_mat)
 		rects.append(AABB(Vector3(x - width * 0.5 - 11.0, 0.0, -extent), Vector3(width + 22.0, 6.0, length_z)))
+		x_lines.append(x)
 		x += step
 
 	_purge_buildings_on_streets(track_root, rects)
+	_build_grid_street_furniture(main, track_root, z_lines, x_lines)
 	print("CityBuilder: built a city street grid (%d streets)" % rects.size())
+
+
+## Finishes the bare street-grid blocks: continuous sidewalks, shop podiums with lit
+## storefront bands, cornices, block lamps, signs and intersection kiosks.
+static func _build_grid_street_furniture(main: Node, track_root: Node3D, z_lines: Array[float], x_lines: Array[float]) -> void:
+	var pad_mat := StandardMaterial3D.new()
+	pad_mat.albedo_texture = TEX_PAVING_DIFF
+	pad_mat.normal_enabled = true
+	pad_mat.normal_texture = TEX_PAVING_NOR
+	pad_mat.roughness_texture = TEX_PAVING_ROUGH
+	pad_mat.uv1_triplanar = true
+	pad_mat.uv1_world_triplanar = true
+	pad_mat.uv1_scale = Vector3.ONE * 0.55
+	pad_mat.albedo_color = Color(0.78, 0.78, 0.76)
+
+	var curb_mat := _make_pbr_concrete(Color(0.62, 0.62, 0.60), 0.72, 0.08)
+	var podium_mat := _make_pbr_concrete(Color(0.44, 0.43, 0.41), 0.62, 0.12)
+	var cornice_mat := _make_pbr_concrete(Color(0.28, 0.28, 0.27), 0.72, 0.10)
+	var pole_mat := _make_pbr_metal(Color(0.16, 0.18, 0.2), 0.32, 0.9)
+	var head_mat := StandardMaterial3D.new()
+	head_mat.albedo_color = Color(1.0, 0.96, 0.86)
+	head_mat.emission_enabled = true
+	head_mat.emission = Color(1.0, 0.9, 0.72)
+	head_mat.emission_energy_multiplier = 2.6
+	var body_mat := _make_pbr_metal(Color(0.12, 0.24, 0.30), 0.35, 0.55)
+	var bin_mat := _make_pbr_metal(Color(0.12, 0.28, 0.20), 0.5, 0.4)
+	var sign_cyan := StandardMaterial3D.new()
+	sign_cyan.albedo_color = Color(0.0, 0.9, 1.0)
+	sign_cyan.emission_enabled = true
+	sign_cyan.emission = Color(0.0, 0.9, 1.0)
+	sign_cyan.emission_energy_multiplier = 2.8
+	var sign_magenta := StandardMaterial3D.new()
+	sign_magenta.albedo_color = Color(1.0, 0.16, 0.72)
+	sign_magenta.emission_enabled = true
+	sign_magenta.emission = Color(1.0, 0.16, 0.72)
+	sign_magenta.emission_energy_multiplier = 2.8
+
+	var store_mats: Array[StandardMaterial3D] = []
+	for i in TEX_STOREFRONTS.size():
+		var sm := StandardMaterial3D.new()
+		sm.albedo_texture = TEX_STOREFRONTS[i]
+		sm.roughness = 0.45
+		sm.emission_enabled = true
+		sm.emission_texture = TEX_STOREFRONTS[i]
+		sm.emission_energy_multiplier = 0.45
+		store_mats.append(sm)
+
+	var walks: Array[Transform3D] = []
+	var curbs: Array[Transform3D] = []
+	var bodies: Array[Transform3D] = []
+	var cornices: Array[Transform3D] = []
+	var b0: Array[Transform3D] = []
+	var b1: Array[Transform3D] = []
+	var b2: Array[Transform3D] = []
+	var b3: Array[Transform3D] = []
+	var sa: Array[Transform3D] = []
+	var sb: Array[Transform3D] = []
+	var poles: Array[Transform3D] = []
+	var heads: Array[Transform3D] = []
+	var pads: Array[Transform3D] = []
+	var kiosks: Array[Transform3D] = []
+	var ksigns: Array[Transform3D] = []
+	var bins: Array[Transform3D] = []
+	var crosswalks: Array[Transform3D] = []
+	var counter := 0
+	var seg := 10.0
+	var extent := 900.0
+
+	# East-west blocks.
+	for z in z_lines:
+		var p := -extent
+		while p < extent:
+			var mx: float = p + seg * 0.5
+			var at_cross := false
+			for xc in x_lines:
+				if absf(mx - xc) < 12.0:
+					at_cross = true
+					break
+			if not at_cross:
+				for side in [-1.0, 1.0]:
+					var sz: float = z + side * 8.5
+					var pc: float = z + side * 12.0
+					if float(main.call("_distance_to_track", mx, sz)) > 26.0 and float(main.call("_distance_to_track", mx, pc)) > 26.0:
+						walks.append(Transform3D(Basis().scaled(Vector3(seg - 0.4, 0.30, 3.0)), Vector3(mx, 0.15, sz)))
+						curbs.append(Transform3D(Basis().scaled(Vector3(seg - 0.4, 0.34, 0.22)), Vector3(mx, 0.17, z + side * 7.11)))
+						var h: float = 5.0 + float((counter * 7) % 5) * 0.9
+						bodies.append(Transform3D(Basis().scaled(Vector3(seg - 0.5, h, 4.0)), Vector3(mx, h * 0.5, pc)))
+						cornices.append(Transform3D(Basis().scaled(Vector3(seg - 0.5, 0.35, 4.4)), Vector3(mx, h + 0.17, pc)))
+						var band := Transform3D(Basis().scaled(Vector3(seg - 1.0, 3.4, 0.2)), Vector3(mx, 1.9, z + side * 10.0))
+						match counter % 4:
+							0: b0.append(band)
+							1: b1.append(band)
+							2: b2.append(band)
+							_: b3.append(band)
+						if counter % 3 == 0:
+							var st := Transform3D(Basis().scaled(Vector3(3.6, 1.0, 0.16)), Vector3(mx, 4.45, z + side * 10.05))
+							if (counter / 3) % 2 == 0:
+								sa.append(st)
+							else:
+								sb.append(st)
+						if counter % 5 == 0:
+							poles.append(Transform3D(Basis().scaled(Vector3(0.18, 5.6, 0.18)), Vector3(mx, 2.8, z + side * 9.6)))
+							heads.append(Transform3D(Basis().scaled(Vector3(0.7, 0.24, 0.7)), Vector3(mx, 5.62, z + side * 9.6)))
+						counter += 1
+			p += seg
+
+	# North-south blocks.
+	for x in x_lines:
+		var p2 := -extent
+		while p2 < extent:
+			var mz: float = p2 + seg * 0.5
+			var at_cross2 := false
+			for zc in z_lines:
+				if absf(mz - zc) < 12.0:
+					at_cross2 = true
+					break
+			if not at_cross2:
+				for side in [-1.0, 1.0]:
+					var sx: float = x + side * 8.5
+					var pcx: float = x + side * 12.0
+					if float(main.call("_distance_to_track", sx, mz)) > 26.0 and float(main.call("_distance_to_track", pcx, mz)) > 26.0:
+						walks.append(Transform3D(Basis().scaled(Vector3(3.0, 0.30, seg - 0.4)), Vector3(sx, 0.15, mz)))
+						curbs.append(Transform3D(Basis().scaled(Vector3(0.22, 0.34, seg - 0.4)), Vector3(x + side * 7.11, 0.17, mz)))
+						var h2: float = 5.0 + float((counter * 7) % 5) * 0.9
+						bodies.append(Transform3D(Basis().scaled(Vector3(4.0, h2, seg - 0.5)), Vector3(pcx, h2 * 0.5, mz)))
+						cornices.append(Transform3D(Basis().scaled(Vector3(4.4, 0.35, seg - 0.5)), Vector3(pcx, h2 + 0.17, mz)))
+						var band2 := Transform3D(Basis().scaled(Vector3(0.2, 3.4, seg - 1.0)), Vector3(x + side * 10.0, 1.9, mz))
+						match counter % 4:
+							0: b0.append(band2)
+							1: b1.append(band2)
+							2: b2.append(band2)
+							_: b3.append(band2)
+						if counter % 3 == 0:
+							var st2 := Transform3D(Basis().scaled(Vector3(0.16, 1.0, 3.6)), Vector3(x + side * 10.05, 4.45, mz))
+							if (counter / 3) % 2 == 0:
+								sa.append(st2)
+							else:
+								sb.append(st2)
+						if counter % 5 == 0:
+							poles.append(Transform3D(Basis().scaled(Vector3(0.18, 5.6, 0.18)), Vector3(x + side * 9.6, 2.8, mz)))
+							heads.append(Transform3D(Basis().scaled(Vector3(0.7, 0.24, 0.7)), Vector3(x + side * 9.6, 5.62, mz)))
+						counter += 1
+			p2 += seg
+
+	# Intersection corner pads, lamps, kiosks and bins.
+	for z in z_lines:
+		for x in x_lines:
+			if float(main.call("_distance_to_track", x, z)) < 30.0:
+				continue
+			for sx in [-10.0, 10.0]:
+				for sz in [-10.0, 10.0]:
+					pads.append(Transform3D(Basis().scaled(Vector3(6.0, 0.16, 6.0)), Vector3(x + sx, 0.16, z + sz)))
+			for corner in [Vector2(10.0, 10.0), Vector2(-10.0, -10.0)]:
+				var lx: float = x + corner.x
+				var lz: float = z + corner.y
+				poles.append(Transform3D(Basis().scaled(Vector3(0.18, 5.6, 0.18)), Vector3(lx, 2.8, lz)))
+				heads.append(Transform3D(Basis().scaled(Vector3(0.7, 0.24, 0.7)), Vector3(lx, 5.62, lz)))
+			var kx: float = x - 10.0
+			var kz: float = z + 10.0
+			kiosks.append(Transform3D(Basis().scaled(Vector3(3.6, 3.6, 3.0)), Vector3(kx, 1.8, kz)))
+			ksigns.append(Transform3D(Basis().scaled(Vector3(3.4, 0.7, 0.12)), Vector3(kx, 3.85, kz - 1.56)))
+			bins.append(Transform3D(Basis().scaled(Vector3(0.8, 1.1, 0.8)), Vector3(x + 10.0, 0.55, z - 10.0)))
+			for k in range(-5, 6):
+				var cx: float = x + float(k) * 1.2
+				var cz: float = z + float(k) * 1.2
+				crosswalks.append(Transform3D(Basis().scaled(Vector3(0.55, 0.02, 4.0)), Vector3(cx, 0.215, z + 10.0)))
+				crosswalks.append(Transform3D(Basis().scaled(Vector3(0.55, 0.02, 4.0)), Vector3(cx, 0.215, z - 10.0)))
+				crosswalks.append(Transform3D(Basis().scaled(Vector3(4.0, 0.02, 0.55)), Vector3(x + 10.0, 0.215, cz)))
+				crosswalks.append(Transform3D(Basis().scaled(Vector3(4.0, 0.02, 0.55)), Vector3(x - 10.0, 0.215, cz)))
+
+	var cross_mat := StandardMaterial3D.new()
+	cross_mat.albedo_color = Color(0.88, 0.88, 0.86)
+	cross_mat.roughness = 0.6
+	_add_multimesh_boxes(track_root, crosswalks, cross_mat, "GridCrosswalks")
+	_add_multimesh_boxes(track_root, walks, pad_mat, "GridSidewalks")
+	_add_multimesh_boxes(track_root, curbs, curb_mat, "GridCurbs")
+	_add_multimesh_boxes(track_root, bodies, podium_mat, "GridPodiums")
+	_add_multimesh_boxes(track_root, cornices, cornice_mat, "GridCornices")
+	_add_multimesh_boxes(track_root, b0, store_mats[0], "GridShops0")
+	_add_multimesh_boxes(track_root, b1, store_mats[1], "GridShops1")
+	_add_multimesh_boxes(track_root, b2, store_mats[2], "GridShops2")
+	_add_multimesh_boxes(track_root, b3, store_mats[3], "GridShops3")
+	_add_multimesh_boxes(track_root, sa, sign_cyan, "GridSignsCyan")
+	_add_multimesh_boxes(track_root, sb, sign_magenta, "GridSignsMagenta")
+	_add_multimesh_boxes(track_root, poles, pole_mat, "GridLampPoles")
+	_add_multimesh_boxes(track_root, heads, head_mat, "GridLampHeads")
+	_add_multimesh_boxes(track_root, pads, pad_mat, "GridCornerPads")
+	_add_multimesh_boxes(track_root, kiosks, body_mat, "GridKioskBodies")
+	_add_multimesh_boxes(track_root, ksigns, sign_cyan, "GridKioskSigns")
+	_add_multimesh_boxes(track_root, bins, bin_mat, "GridBins")
 
 
 static func _add_street_line(track_root: Node3D, pos: Vector3, size: Vector3, mat: Material) -> void:
