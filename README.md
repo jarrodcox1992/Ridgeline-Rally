@@ -33,6 +33,7 @@ Every rival and every person on the street has their own character.
 - **Rival drivers:** Blaze (aggressive — defends hard and fights back when overtaken), Pearl (technician — clean lines and gives you room), Red (wildcard — brakes late and taunts you).
 - **Pedestrians:** timid (jumps clear early), curious (leans out to watch), oblivious (keeps walking), friendly (stops to wave you through).
 - **Traffic:** polite (eases over to let you past), aggressive (speeds up and honks), tourist (slow drifters), courier (weaving scooters).
+- **The crowd:** about 5,000 extra people fill the sidewalks and plazas, gathered in small groups — queues at bus stops, friends in plazas, onlookers at the kerb. Each group has a personality that decides where they stand and how they sway.
 - Press **G** / gamepad **B** to sound the horn: nearby pedestrians react by personality and traffic honks back.
 
 ## Files

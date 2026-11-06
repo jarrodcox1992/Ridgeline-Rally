@@ -308,6 +308,7 @@ static func build_city(main: Node, track_root: Node3D) -> void:
 	_build_waterfront_harbor_and_smokestacks(main, track_root, rng)
 	_build_neon_billboards(main, track_root, rng, living_ctrl)
 	_build_urban_soundscapes(main, track_root)
+	_build_dense_crowd(main, track_root, rng)
 	_purge_carriageway_intrusions(main, track_root)
 	print("CityBuilder: Neo-Veridia // Sector-9 Cyberpunk Metropolis fully operational!")
 
@@ -2270,3 +2271,159 @@ static func _init_industrial_materials() -> Array[ShaderMaterial]:
 		m.set_shader_parameter("use_pbr_tex", true)
 		mats.append(m)
 	return mats
+
+
+## ---------------------------------------------------------------------------
+## Dense ambient crowd: thousands of lightweight instanced people (MultiMesh) so
+## the streets feel packed. Each person is dealt a personality that decides where
+## they stand and how they behave (timid people keep back near the buildings,
+## curious ones crowd the kerb, friendly ones gather in the plazas), and a subtle
+## sway shader keeps the crowd alive for almost no CPU cost.
+## ---------------------------------------------------------------------------
+const CROWD_SHADER := """
+shader_type spatial;
+render_mode cull_back, diffuse_burley;
+
+void vertex() {
+	float phase = INSTANCE_CUSTOM.r * 6.2831853;
+	float activity = INSTANCE_CUSTOM.g;
+	float h = max(VERTEX.y, 0.0);
+	float s = sin(TIME * 1.6 + phase);
+	VERTEX.x += s * 0.035 * activity * h;
+	VERTEX.z += cos(TIME * 1.25 + phase) * 0.020 * activity * h;
+}
+
+void fragment() {
+	ALBEDO = COLOR.rgb;
+	ROUGHNESS = 0.85;
+	SPECULAR = 0.2;
+}
+"""
+
+static func _build_crowd_mesh(radius: float, height: float, head_r: float) -> ArrayMesh:
+	# A simple stylised humanoid: two legs, a torso, two arms and a head, ~1.7 m tall.
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var leg_h: float = height * 0.5
+	var leg_w: float = radius * 0.58
+	for sx in [-1.0, 1.0]:
+		var leg := BoxMesh.new()
+		leg.size = Vector3(leg_w, leg_h, leg_w * 1.1)
+		st.append_from(leg, 0, Transform3D(Basis(), Vector3(sx * radius * 0.40, leg_h * 0.5, 0.0)))
+	var torso := CapsuleMesh.new()
+	torso.radius = radius
+	torso.height = maxf(height * 0.66, radius * 2.05)
+	torso.radial_segments = 6
+	torso.rings = 3
+	st.append_from(torso, 0, Transform3D(Basis(), Vector3(0.0, leg_h + torso.height * 0.5, 0.0)))
+	for sx in [-1.0, 1.0]:
+		var arm := BoxMesh.new()
+		arm.size = Vector3(leg_w * 0.8, height * 0.38, leg_w * 0.9)
+		st.append_from(arm, 0, Transform3D(Basis(), Vector3(sx * (radius + leg_w * 0.45), leg_h + height * 0.34, 0.0)))
+	var head := SphereMesh.new()
+	head.radius = head_r
+	head.height = head_r * 2.0
+	head.radial_segments = 6
+	head.rings = 3
+	st.append_from(head, 0, Transform3D(Basis(), Vector3(0.0, leg_h + torso.height + head_r * 1.1, 0.0)))
+	return st.commit()
+
+
+static func _build_dense_crowd(main: Node, track_root: Node3D, rng: RandomNumberGenerator) -> void:
+	if not main.has_method("_track_transform"):
+		return
+	var track_len: float = float(main.get("track_length"))
+	var road_half: float = float(main.get("ROAD_HALF_WIDTH"))
+	if track_len < 200.0:
+		return
+
+	var shader := Shader.new()
+	shader.code = CROWD_SHADER
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+
+	# Clothing palette: muted city tones with a few bright accents.
+	var palette: Array[Color] = [
+		Color(0.10, 0.11, 0.15), Color(0.20, 0.22, 0.28), Color(0.35, 0.34, 0.30),
+		Color(0.55, 0.52, 0.47), Color(0.14, 0.26, 0.40), Color(0.45, 0.12, 0.16),
+		Color(0.12, 0.35, 0.28), Color(0.62, 0.58, 0.55), Color(0.30, 0.18, 0.34),
+		Color(0.70, 0.45, 0.18),
+	]
+
+	# Four body types, ~1,250 people each -> about 5,000 people in total.
+	var variants: Array = [
+		[_build_crowd_mesh(0.20, 0.95, 0.105), 1250],
+		[_build_crowd_mesh(0.26, 1.02, 0.120), 1250],
+		[_build_crowd_mesh(0.22, 0.78, 0.100), 1250],
+		[_build_crowd_mesh(0.16, 0.62, 0.090), 1250],
+	]
+
+	# CROWD_SCALE env var scales the population (handy for profiling; 1.0 is the full city).
+	var crowd_scale := 1.0
+	if OS.get_environment("CROWD_SCALE") != "":
+		crowd_scale = maxf(0.0, float(OS.get_environment("CROWD_SCALE")))
+
+	var total := 0
+	for vi in variants.size():
+		var mesh: ArrayMesh = variants[vi][0]
+		var count: int = int(variants[vi][1] * crowd_scale)
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		mm.use_custom_data = true
+		mm.mesh = mesh
+		mm.instance_count = count
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = "Crowd_%d" % vi
+		mmi.multimesh = mm
+		mmi.material_override = mat
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		track_root.add_child(mmi)
+
+		# Gather people in small clusters (a queue at a bus stop, friends in a plaza,
+		# curious onlookers at the kerb) so the streets read as busy rather than evenly sprinkled.
+		var idx := 0
+		while idx < count:
+			var cluster_o: float = rng.randf() * track_len
+			var cluster_side: float = 1.0 if rng.randf() < 0.5 else -1.0
+			var persona: int = rng.randi() % 4
+			var members: int = rng.randi_range(3, 7)
+			for m in members:
+				if idx >= count:
+					break
+				var o: float = fposmod(cluster_o + rng.randf_range(-3.5, 3.5), track_len)
+				var xf: Transform3D = main.call("_track_transform", o, 0.0)
+				if xf.origin.y > 2.5:
+					idx += 1
+					continue
+				var lat: float = 0.0
+				var facing: float = 0.0
+				match persona:
+					0: # TIMID: keeps back, away from the road
+						lat = road_half + 5.0 + rng.randf_range(0.0, 2.0)
+						facing = 180.0
+					1: # CURIOUS: right at the kerb, watching the traffic
+						lat = road_half + 1.7 + rng.randf_range(0.0, 0.7)
+						facing = -90.0 * cluster_side
+					2: # OBLIVIOUS: mid-sidewalk, going about their day
+						lat = road_half + 3.1 + rng.randf_range(0.0, 1.2)
+						facing = rng.randf_range(0.0, 360.0)
+					_: # FRIENDLY: gathered out in the plaza
+						lat = road_half + 6.5 + rng.randf_range(0.0, 6.0)
+						facing = rng.randf_range(-55.0, 55.0)
+
+				var pos: Vector3 = xf * Vector3(cluster_side * lat, 0.40, 0.0)
+				var yaw: float = deg_to_rad(facing) + xf.basis.get_euler().y
+				var sc: float = rng.randf_range(0.92, 1.08)
+				var basis := Basis(Vector3.UP, yaw).scaled(Vector3(sc, sc, sc))
+				mm.set_instance_transform(idx, Transform3D(basis, pos))
+				mm.set_instance_color(idx, palette[rng.randi() % palette.size()])
+				var activity: float = 0.35 if persona == 0 else 1.0
+				mm.set_instance_custom_data(idx, Color(rng.randf(), activity, float(persona) / 3.0, 0.0))
+				total += 1
+				idx += 1
+		# Hide any unused instances.
+		for k in range(idx, count):
+			mm.set_instance_transform(k, Transform3D(Basis().scaled(Vector3.ZERO), Vector3(0.0, -1000.0, 0.0)))
+
+	print("CityBuilder: populated the streets with %d crowdspeople" % total)

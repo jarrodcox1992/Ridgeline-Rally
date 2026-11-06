@@ -108,3 +108,9 @@ Found by driving the race through scripted runs, then fixed:
 - **Pedestrians react by personality:** timid jump clear early, curious lean out to watch, oblivious barely notice, friendly stop and wave. All react to the player's horn.
 - **Traffic has attitudes:** polite drivers ease aside, aggressive ones speed up and honk, tourists drift slowly, couriers weave. Traffic honks back at the player's horn.
 - **Player horn** on G / gamepad B.
+
+## Thriving city crowd
+
+- Added about 5,000 ambient people (four body types, instanced with `MultiMeshInstance3D` and a cheap sway shader) placed in personality-based clusters along the sidewalks and plazas: timid back from the road, curious at the kerb, oblivious on the pavement, friendly in the plazas. Four draw calls, no shadows, negligible CPU.
+- `CROWD_SCALE` env var scales the population for profiling.
+
