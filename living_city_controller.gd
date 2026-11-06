@@ -31,6 +31,22 @@ enum CitizenRole {
 	TERRACE_COMMUTER
 }
 
+## Each pedestrian has a personality that decides how they react to the player's car.
+enum Persona {
+	TIMID,     # Notices a car early and jumps back well clear
+	CURIOUS,   # Leans toward the road to watch the car go by
+	OBLIVIOUS, # Barely notices; keeps walking
+	FRIENDLY,  # Stops and waves the car through
+}
+
+## Each traffic vehicle drives with an attitude of its own.
+enum TrafficPersona {
+	POLITE,     # Eases off and pulls aside to let the player past
+	AGGRESSIVE, # Speeds up to hold its line and honks a lot
+	TOURIST,    # Drifts slowly along, unhurried
+	COURIER,    # Weaves through gaps (scooters)
+}
+
 var main_node: Node
 var track_len: float = 2800.0
 var road_half: float = 11.5
@@ -61,6 +77,7 @@ var _security_drones: Array[Dictionary] = []
 var _traffic_vehicles: Array[Dictionary] = []
 var _traffic_signals: Array[Dictionary] = []
 var _horn_stream: AudioStreamWAV
+var _ped_persona_seq: int = 0
 
 # 6. Dynamic Lighting (Quad-Strobes, Flickering Neon, Holographic Portals)
 var _strobe_lights: Array[Dictionary] = []
@@ -293,6 +310,11 @@ func register_el_train(node: Node3D, start_offset: float, speed: float, dir: flo
 
 
 func register_pedestrian(node: Node3D, offset: float, lat: float, speed: float, dir: float, base_scale: float, phase: float, role: int = CitizenRole.COMMUTER, elev_y: float = 0.40, bridge_span: float = 0.0, z_local: float = 0.0) -> void:
+	# Commuters are dealt a personality in rotation so the street feels mixed; others are stationary.
+	var persona: int = Persona.OBLIVIOUS
+	if role == CitizenRole.COMMUTER or role == CitizenRole.SKYBRIDGE_COMMUTER or role == CitizenRole.TERRACE_COMMUTER:
+		persona = _ped_persona_seq % 4
+		_ped_persona_seq += 1
 	_citizens.append({
 		"node": node,
 		"offset": offset,
@@ -307,7 +329,10 @@ func register_pedestrian(node: Node3D, offset: float, lat: float, speed: float, 
 		"bridge_span": bridge_span,
 		"z_local": z_local,
 		"wait_timer": 0.0,
-		"dodge_timer": 0.0
+		"dodge_timer": 0.0,
+		"watch_timer": 0.0,
+		"wave_timer": 0.0,
+		"persona": persona
 	})
 
 
@@ -637,6 +662,17 @@ func register_traffic_vehicle(node: Node3D, offset: float, lat: float, speed: fl
 	horn_player.volume_db = -6.0
 	node.add_child(horn_player)
 
+	# Give each vehicle an attitude; cargo and buses are laid back, scooters weave, sedans mix.
+	var persona: int = TrafficPersona.POLITE
+	match vtype:
+		"bus":
+			persona = TrafficPersona.POLITE
+		"truck":
+			persona = TrafficPersona.TOURIST
+		"scooter":
+			persona = TrafficPersona.COURIER
+		_:
+			persona = [TrafficPersona.POLITE, TrafficPersona.AGGRESSIVE, TrafficPersona.TOURIST][_traffic_vehicles.size() % 3]
 	_traffic_vehicles.append({
 		"node": node,
 		"offset": offset,
@@ -648,6 +684,7 @@ func register_traffic_vehicle(node: Node3D, offset: float, lat: float, speed: fl
 		"y_offset": y_offset,
 		"rot_fix": rot_y_Fix,
 		"vtype": vtype,
+		"persona": persona,
 		"stop_timer": 0.0,
 		"last_stop_offset": -999.0,
 		"horn_cooldown": 0.0,
@@ -707,6 +744,29 @@ func add_neon_hum_emitter(pos: Vector3) -> void:
 	player.autoplay = true
 	player.position = pos
 	add_child(player)
+
+
+## The player sounds their horn: nearby pedestrians react by personality and traffic honks back.
+func honk_from(pos: Vector3) -> void:
+	for cit in _citizens:
+		var node: Node3D = cit.node
+		if not is_instance_valid(node) or node.global_position.distance_squared_to(pos) > 625.0: # 25m
+			continue
+		match int(cit.get("persona", Persona.OBLIVIOUS)):
+			Persona.TIMID:
+				cit.dodge_timer = maxf(float(cit.dodge_timer), 1.6)
+			Persona.CURIOUS:
+				cit.watch_timer = maxf(float(cit.get("watch_timer", 0.0)), 2.0)
+			Persona.FRIENDLY:
+				cit.wave_timer = maxf(float(cit.get("wave_timer", 0.0)), 2.2)
+			_:
+				pass
+	for veh in _traffic_vehicles:
+		var vn: Node3D = veh.node
+		if is_instance_valid(vn) and vn.global_position.distance_squared_to(pos) < 1600.0: # 40m
+			var hp: AudioStreamPlayer3D = veh.horn_player
+			if is_instance_valid(hp) and not hp.playing:
+				hp.play()
 
 
 func _process(delta: float) -> void:
@@ -792,14 +852,28 @@ func _process(delta: float) -> void:
 						target_spd = 0.0
 						break
 
-		# Player Proximity Check: brake and honk cyber-horn if player car cuts right in front of vehicle
+		# Personality toward the player: polite drivers yield, aggressive ones hold their ground,
+		# tourists dawdle, couriers are already weaving.
 		var v_pos: Vector3 = node.global_position
-		if v_pos.distance_squared_to(player_pos) < 196.0: # within 14m
-			if float(veh.horn_cooldown) <= 0.0:
-				var hp: AudioStreamPlayer3D = veh.horn_player
-				if is_instance_valid(hp) and not hp.playing:
-					hp.play()
-				veh.horn_cooldown = 4.5
+		var player_dist: float = v_pos.distance_to(player_pos)
+		var persona: int = int(veh.get("persona", TrafficPersona.POLITE))
+		if player_dist < 34.0 and target_spd > 0.0:
+			match persona:
+				TrafficPersona.POLITE:
+					target_spd = minf(target_spd, float(veh.speed) * 0.75)
+				TrafficPersona.AGGRESSIVE:
+					target_spd = float(veh.speed) * 1.18
+				TrafficPersona.TOURIST:
+					target_spd = float(veh.speed) * 0.7
+				_:
+					pass
+
+		# Horn when the player is right on top of them; aggressive drivers lean on it.
+		if player_dist < 14.0 and float(veh.horn_cooldown) <= 0.0:
+			var hp: AudioStreamPlayer3D = veh.horn_player
+			if is_instance_valid(hp) and not hp.playing and persona != TrafficPersona.TOURIST:
+				hp.play()
+			veh.horn_cooldown = 2.2 if persona == TrafficPersona.AGGRESSIVE else 5.0
 
 		var cur_spd: float = move_toward(float(veh.cur_speed), target_spd, 9.5 * delta)
 		veh.cur_speed = cur_spd
@@ -808,6 +882,10 @@ func _process(delta: float) -> void:
 
 		var xform: Transform3D = main_node.call("_track_transform", cur_o, 0.0)
 		var lat_val: float = float(veh.base_lat)
+		if persona == TrafficPersona.POLITE and player_dist < 24.0:
+			lat_val += 1.3 if lat_val >= 0.0 else -1.3  # ease toward the kerb
+		elif persona == TrafficPersona.TOURIST:
+			lat_val += sin(_time * 0.7 + cur_o * 0.05) * 0.35  # gentle drift
 		# Reckless Motorcycle/Scooter Couriers weave dynamically through traffic
 		if vtype == "scooter":
 			lat_val += sin(_time * 3.8 + cur_o * 0.08) * 0.55
@@ -876,21 +954,50 @@ func _process(delta: float) -> void:
 			node.transform = Transform3D(b, wpos)
 			continue
 
-		# COMMUTER AI: Check proximity to speeding player car for reactive dodge & startle
+		# COMMUTER AI: each pedestrian notices and reacts to the player's car differently.
 		var cpos: Vector3 = node.global_position
 		var dist_sq_player: float = cpos.distance_squared_to(player_pos)
 		var base_lat: float = float(cit.base_lat)
 		var side_sign: float = 1.0 if base_lat >= 0.0 else -1.0
+		var persona: int = int(cit.get("persona", Persona.OBLIVIOUS))
 
-		if dist_sq_player < 169.0: # Player car within 13m -> Dodge back toward building wall & startle!
-			cit.dodge_timer = 1.5
+		# How soon they notice the car depends on their personality.
+		var notice_sq: float = 49.0
+		match persona:
+			Persona.TIMID:
+				notice_sq = 400.0 # 20m: reacts early
+			Persona.CURIOUS, Persona.FRIENDLY:
+				notice_sq = 225.0 # 15m
+			_:
+				notice_sq = 49.0 # 7m: barely notices
+		if dist_sq_player < notice_sq:
+			match persona:
+				Persona.TIMID:
+					cit.dodge_timer = 1.8
+				Persona.CURIOUS:
+					cit.watch_timer = 2.2
+				Persona.FRIENDLY:
+					cit.wave_timer = 2.4
+				_:
+					pass
 
 		var target_lat: float = base_lat
 		var spd_mult: float = 1.0
+		var facing_player: bool = false
 		if float(cit.dodge_timer) > 0.0:
 			cit.dodge_timer = float(cit.dodge_timer) - delta
-			target_lat = base_lat + side_sign * 1.15 # Step away from curb toward building wall
-			spd_mult = 0.0 # Pause and watch speeding car
+			target_lat = base_lat + side_sign * (1.7 if persona == Persona.TIMID else 1.15)
+			spd_mult = 0.0
+			facing_player = true
+		elif float(cit.watch_timer) > 0.0:
+			cit.watch_timer = float(cit.watch_timer) - delta
+			target_lat = base_lat - side_sign * 0.5 # lean toward the road for a better look
+			spd_mult = 0.0
+			facing_player = true
+		elif float(cit.wave_timer) > 0.0:
+			cit.wave_timer = float(cit.wave_timer) - delta
+			spd_mult = 0.0
+			facing_player = true
 		elif weather_state == WeatherState.ACID_RAIN:
 			# During acid rain, commuters rush faster and hug the awning line closer to buildings
 			target_lat = base_lat + side_sign * 0.65
@@ -921,7 +1028,7 @@ func _process(delta: float) -> void:
 
 		var world_pos: Vector3 = xform * Vector3(float(cit.lat), float(cit.elev_y) + bob_y, 0.0)
 		var heading_deg: float = 0.0 if float(cit.dir) > 0.0 else 180.0
-		if float(cit.dodge_timer) > 0.0:
+		if facing_player:
 			heading_deg = 90.0 if side_sign < 0.0 else -90.0 # Turn to watch the road!
 		var b: Basis = xform.basis.rotated(xform.basis.y.normalized(), deg_to_rad(heading_deg))
 		b = b.rotated(b.z.normalized(), sway_angle)

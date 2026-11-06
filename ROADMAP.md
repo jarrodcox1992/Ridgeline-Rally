@@ -101,3 +101,10 @@ Found by driving the race through scripted runs, then fixed:
 ## Known issues
 
 - Track 0 can occasionally leave the car wedged against a sidewalk prop. The game now shows a "Stuck? Press R to reset" hint after 3 seconds stopped off the road; the drive test resets the car automatically and continues.
+
+## Interactive personalities
+
+- **Rival drivers have personalities:** Blaze (aggressive, defends the line, boosts to retake a place), Pearl (technical, clean and gives room), Red (wildcard, late braking and wobble). Each taunts the player when overtaken.
+- **Pedestrians react by personality:** timid jump clear early, curious lean out to watch, oblivious barely notice, friendly stop and wave. All react to the player's horn.
+- **Traffic has attitudes:** polite drivers ease aside, aggressive ones speed up and honk, tourists drift slowly, couriers weave. Traffic honks back at the player's horn.
+- **Player horn** on G / gamepad B.

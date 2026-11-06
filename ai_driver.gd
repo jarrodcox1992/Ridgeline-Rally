@@ -22,19 +22,41 @@ var _rev_phase := randf() * TAU
 var _route_pref: int = -1
 var _active_alt_curve: Curve3D = null
 
+# Personality
+var _aggression := 0.5
+var _braking := BRAKING
+var _grip := CORNER_GRIP
+var _wobble := 0.0
+var _taunt := ""
+var _time := 0.0
+var _wander_phase := randf() * TAU
+var _player_was_ahead := false
+var _reaction_cd := 0.0
+var _boost := 0.0
+
 
 ## skill scales every speed target; lane is the preferred offset from the centreline
 ## in metres (+ is the driver's left); route_pref (0=Overpass, 1=Bypass, 2=Tunnel).
-func setup(car: VehicleBody3D, main: Node, skill: float, lane: float, route_pref: int = -1) -> void:
+func setup(car: VehicleBody3D, main: Node, skill: float, lane: float, route_pref: int = -1, persona: Dictionary = {}) -> void:
 	_car = car
 	_main = main
 	_skill = skill
 	_lane = lane
 	_lane_now = lane
 	_route_pref = route_pref
+	if not persona.is_empty():
+		_aggression = float(persona.get("aggression", 0.5))
+		_braking = float(persona.get("braking", BRAKING))
+		_grip = float(persona.get("grip", CORNER_GRIP))
+		_wobble = float(persona.get("wobble", 0.0))
+		_taunt = String(persona.get("taunt", ""))
 
 
 func _physics_process(delta: float) -> void:
+	_time += delta
+	if _reaction_cd > 0.0:
+		_reaction_cd = maxf(0.0, _reaction_cd - delta)
+	_boost = maxf(0.0, _boost - delta * 0.8)
 	var input: Dictionary = _car.ai_input
 	if _car.frozen:
 		# Blip the throttle on the grid like a real driver.
@@ -74,17 +96,40 @@ func _physics_process(delta: float) -> void:
 				if _car.global_position.distance_to(entry_pt) < 22.0:
 					_active_alt_curve = cand_curve
 
+	_react_to_player(offset, delta)
+
 	_lane_now = move_toward(_lane_now, _choose_lane(offset), delta * 1.8)
 	var target: Transform3D = _main._track_transform(offset + 10.0 + speed * 0.45, 0.0)
 	var aim := _car.global_transform.affine_inverse() * (target.origin + target.basis.x * _lane_now)
 	input.steer = clampf(atan2(aim.x, aim.z) * 2.2, -1.0, 1.0)
 
-	var limit := _speed_limit(offset) * _skill * difficulty
+	var limit := _speed_limit(offset) * _skill * difficulty * (1.0 + _boost)
+	if _wobble > 0.0:
+		limit *= 1.0 + sin(_time * 0.8 + _wander_phase) * _wobble
 	input.accelerate = 1.0 if speed < limit else 0.0
 	input.brake = clampf((speed - limit) / 5.0, 0.0, 1.0) if speed > limit + 1.5 else 0.0
 	input.handbrake = false
 
 	_recover_if_stuck(offset, speed, delta)
+
+
+## Reacts to the player: taunts when overtaken, and a high-aggression driver fights back.
+func _react_to_player(offset: float, _delta: float) -> void:
+	var player := _main.get("car") as VehicleBody3D
+	if not is_instance_valid(player) or player == _car:
+		return
+	var here: Transform3D = _main._track_transform(offset, 0.0)
+	var rel: Vector3 = here.affine_inverse() * player.global_position
+	var player_ahead: bool = rel.z > 0.0 and rel.z < 28.0 and absf(rel.x) < 8.0
+	if player_ahead and not _player_was_ahead and _reaction_cd <= 0.0 and _taunt != "":
+		_reaction_cd = 8.0
+		if _main.has_method("_show_message"):
+			_main.call("_show_message", _taunt, 3.0)
+		if _aggression > 0.55:
+			_boost = 1.0  # Dig in and try to retake the place.
+		else:
+			_lane = clampf(_lane + (4.0 if rel.x > 0.0 else -4.0), -MAX_LANE, MAX_LANE)  # Give room
+	_player_was_ahead = player_ahead
 
 
 ## The fastest speed from which the car can still brake down for every bend in the next stretch.
@@ -95,8 +140,8 @@ func _speed_limit(offset: float) -> float:
 		var a := offset + distance
 		var bend := absf(_main._track_dir(a).signed_angle_to(_main._track_dir(a + BEND_ARC), Vector3.UP))
 		# A bend turning this much over BEND_ARC metres has radius BEND_ARC / bend; v = sqrt(grip * radius).
-		var corner_speed := minf(STRAIGHT_SPEED, sqrt(CORNER_GRIP * BEND_ARC / maxf(bend, 0.001)))
-		limit = minf(limit, sqrt(corner_speed * corner_speed + 2.0 * BRAKING * distance))
+		var corner_speed := minf(STRAIGHT_SPEED, sqrt(_grip * BEND_ARC / maxf(bend, 0.001)))
+		limit = minf(limit, sqrt(corner_speed * corner_speed + 2.0 * _braking * distance))
 	return limit
 
 
@@ -116,6 +161,16 @@ func _choose_lane(offset: float) -> float:
 			if absf(pass_lane) > MAX_LANE:
 				pass_lane = other_lane - 4.5 * signf(pass_lane)
 			return clampf(pass_lane, -MAX_LANE, MAX_LANE)
+	# Personality: an aggressive driver blocks a player trying to pass; a calm one opens a lane.
+	var player := _main.get("car") as VehicleBody3D
+	if is_instance_valid(player) and player != _car:
+		var prel: Vector3 = here.affine_inverse() * player.global_position
+		var player_behind := prel.z < 0.0 and prel.z > -18.0
+		if player_behind and absf(prel.x - _lane_now) < 3.6:
+			if _aggression > 0.55:
+				return clampf(prel.x, -MAX_LANE, MAX_LANE)
+			elif _aggression < 0.3:
+				return clampf(_lane + (4.2 if prel.x >= _lane_now else -4.2), -MAX_LANE, MAX_LANE)
 	return _lane
 
 

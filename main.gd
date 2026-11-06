@@ -114,10 +114,35 @@ const CAMERA_VIEWS := [
 	{"name": "Cockpit camera", "mode": "cockpit"},
 ]
 ## Opponents: paint colour and skill (scales their target speeds).
+## Each opponent has a distinct personality. `persona` drives the AI's behaviour:
+## aggression (0 = lets you pass, 1 = defends hard), braking (m/s^2 it dares to use),
+## grip (cornering margin), wobble (how much its pace drifts), and a taunt shown to the
+## player when they overtake it.
 const OPPONENTS := [
-	{"name": "Blue", "color": Color(0.04, 0.16, 0.55), "skill": 1.0},
-	{"name": "Pearl", "color": Color(0.85, 0.85, 0.82), "skill": 0.96},
-	{"name": "Red", "color": Color(0.62, 0.04, 0.03), "skill": 0.92},
+	{
+		"name": "Blaze", "color": Color(0.04, 0.16, 0.55), "skill": 1.0,
+		"persona": {
+			"title": "The Enforcer",
+			"aggression": 0.95, "braking": 8.4, "grip": 9.2, "wobble": 0.015,
+			"taunt": "Blaze: Not today. That line's mine.",
+		},
+	},
+	{
+		"name": "Pearl", "color": Color(0.85, 0.85, 0.82), "skill": 0.96,
+		"persona": {
+			"title": "The Technician",
+			"aggression": 0.15, "braking": 7.4, "grip": 9.5, "wobble": 0.0,
+			"taunt": "Pearl: Clean move. Nice line through the apex.",
+		},
+	},
+	{
+		"name": "Red", "color": Color(0.62, 0.04, 0.03), "skill": 0.92,
+		"persona": {
+			"title": "The Wildcard",
+			"aggression": 0.7, "braking": 9.0, "grip": 8.5, "wobble": 0.05,
+			"taunt": "Red: Brakes are for people who slow down!",
+		},
+	},
 ]
 ## Start grid slots across highway lanes: distance back and offset to driver's left.
 ## Staggered across lanes: Lane 1 (-4.6m), Lane 4 (+4.6m), Lane 2 (-1.5m), Lane 1 (-4.6m)
@@ -569,6 +594,8 @@ func _physics_process(delta: float) -> void:
 		_trigger_nearest_road_repair()
 	if Input.is_action_just_pressed("reset_car"):
 		_reset_car()
+	if Input.is_action_just_pressed("horn"):
+		_honk()
 	if Input.is_action_just_pressed("show_fps"):
 		fps_label.visible = not fps_label.visible
 	if Input.is_action_just_pressed("camera"):
@@ -767,6 +794,7 @@ func _setup_input() -> void:
 	_add_action("next_track", [KEY_T], [], [])
 	_add_action("camera", [KEY_C], [JOY_BUTTON_BACK], [])
 	_add_action("headlights", [KEY_H], [JOY_BUTTON_DPAD_UP], [])
+	_add_action("horn", [KEY_G], [JOY_BUTTON_B], [])
 	_add_action("look_back", [KEY_B], [JOY_BUTTON_LEFT_SHOULDER], [])
 	_add_action("show_fps", [KEY_F], [], [])
 	_add_action("repair_road", [KEY_K], [JOY_BUTTON_X], [])
@@ -1890,7 +1918,7 @@ func _spawn_car() -> void:
 			var driver := AIDriverScript.new()
 			racer.add_child(driver)
 			var route_choice := (i - 1) % 3
-			driver.setup(racer, self, OPPONENTS[i].skill, slot.y, route_choice)
+			driver.setup(racer, self, OPPONENTS[i].skill, slot.y, route_choice, OPPONENTS[i].persona)
 			ai_drivers.append(driver)
 		cars.append(racer)
 		progress[racer] = -slot.x
@@ -2032,12 +2060,39 @@ func _race_rank(racer: VehicleBody3D) -> float:
 
 var _last_grounded_offset: float = -1.0
 var _stuck_time: float = 0.0
+var _player_horn: AudioStreamPlayer3D = null
 var _stuck_hinted: bool = false
 
 func _reset_car() -> void:
 	flipped_time = 0.0
 	var offset := _last_grounded_offset if _last_grounded_offset >= 0.0 else curve.get_closest_offset(car.global_position)
 	(car as CarScript).reset_to(_track_transform(offset, 0.8))
+
+
+## Player horn: sounds the car's horn and lets the city react (pedestrians by personality, traffic honks back).
+func _honk() -> void:
+	if not is_instance_valid(car):
+		return
+	if _player_horn == null:
+		_player_horn = AudioStreamPlayer3D.new()
+		_player_horn.unit_size = 18.0
+		_player_horn.max_distance = 95.0
+		_player_horn.volume_db = -4.0
+		car.add_child(_player_horn)
+	var city := _living_city()
+	if city:
+		if _player_horn.stream == null:
+			var hs = city.get("_horn_stream")
+			if hs is AudioStream:
+				_player_horn.stream = hs
+		if city.has_method("honk_from"):
+			city.call("honk_from", car.global_position)
+	if _player_horn.stream and not _player_horn.playing:
+		_player_horn.play()
+
+
+func _living_city() -> Node:
+	return _track_root.get_node_or_null("LivingCityController") if is_instance_valid(_track_root) else null
 
 
 func load_track(index: int) -> void:

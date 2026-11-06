@@ -18,12 +18,22 @@ Open Godot, click **Import**, choose this folder's `project.godot`, then press *
 | Repair road (dispatch crew) | K | X |
 | Next track (cycle circuits) | T | |
 | Switch camera (chase / far chase / bumper / cockpit) | C | Back |
+| Horn (pedestrians react, traffic honks back) | G | B |
 | Look back | B (hold) | Left shoulder |
 | Headlights | H | D-pad up |
 | Show frame rate | F | |
 | Photo mode (orbit with mouse drag or arrows, zoom with wheel or + -, Space saves to Pictures) | V | Right shoulder |
 | Burnout | Hold Space and full throttle while stopped | |
 | Pause menu (restart, AI difficulty, time of day, graphics quality, fullscreen, quit) | Esc or P | Start |
+
+## Personalities
+
+Every rival and every person on the street has their own character.
+
+- **Rival drivers:** Blaze (aggressive — defends hard and fights back when overtaken), Pearl (technician — clean lines and gives you room), Red (wildcard — brakes late and taunts you).
+- **Pedestrians:** timid (jumps clear early), curious (leans out to watch), oblivious (keeps walking), friendly (stops to wave you through).
+- **Traffic:** polite (eases over to let you past), aggressive (speeds up and honks), tourist (slow drifters), courier (weaving scooters).
+- Press **G** / gamepad **B** to sound the horn: nearby pedestrians react by personality and traffic honks back.
 
 ## Files
 
