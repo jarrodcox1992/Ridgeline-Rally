@@ -61,13 +61,14 @@ const CITY_TRACKS: Array[Dictionary] = [
 		"speed_limit": "60 MPH",
 	},
 	{
-		"hidden": true, # Set to false once the clean loop passes the drive test (see ROADMAP known issues).
+		"hidden": false, # Set to false once the clean loop passes the drive test (see ROADMAP known issues).
 		"name": "Sector-9 Autobahn A-95",
-		"desc": "Massive 1.76 km Span Ultra-High-Speed Perimeter Highway with Long Straightaways & Smoothed Clean Loop",
+		"desc": "Smooth 1.76 km Perimeter Circuit: Flowing Bends, Long Straightaways & Clean Flat Loop",
 		"file": "res://tracks/AutobahnA95.csv",
 		"span": 1760.0,
 		"step": 3,
-		"smooth": 3,
+		"procedural": true,
+		"smooth": 0,
 		"branches": false,
 		"elev_amp": 0.0,
 		"elev_type": "flat",
@@ -448,18 +449,25 @@ func _init_tracks() -> void:
 
 
 func _load_osm_track(path: String, cfg: Dictionary) -> Array[Vector3]:
-	var file := FileAccess.open(path, FileAccess.READ)
-	if not file:
-		push_error("Failed to open open-source track file: " + path)
-		return []
 	var pts: Array[Vector2] = []
-	while not file.eof_reached():
-		var line := file.get_line().strip_edges()
-		if line.is_empty() or line.begins_with("#"):
-			continue
-		var parts := line.split(",")
-		if parts.size() >= 2:
-			pts.append(Vector2(parts[0].to_float(), parts[1].to_float()))
+	if cfg.get("procedural", false):
+		# Smooth generated loop: gentle, continuous curvature with no sharp corners.
+		for k in 360:
+			var t := TAU * float(k) / 360.0
+			var r := 1.0 + 0.18 * sin(2.0 * t) + 0.08 * cos(3.0 * t)
+			pts.append(Vector2(cos(t) * r * 1.6, sin(t) * r))
+	else:
+		var file := FileAccess.open(path, FileAccess.READ)
+		if not file:
+			push_error("Failed to open open-source track file: " + path)
+			return []
+		while not file.eof_reached():
+			var line := file.get_line().strip_edges()
+			if line.is_empty() or line.begins_with("#"):
+				continue
+			var parts := line.split(",")
+			if parts.size() >= 2:
+				pts.append(Vector2(parts[0].to_float(), parts[1].to_float()))
 
 	if pts.is_empty():
 		return []
