@@ -37,6 +37,11 @@ enum Persona {
 	CURIOUS,   # Leans toward the road to watch the car go by
 	OBLIVIOUS, # Barely notices; keeps walking
 	FRIENDLY,  # Stops and waves the car through
+	HURRIED,   # Power-walks through the crowd, sidesteps late
+	TOURIST,   # Stops to gawk and snap photos of the car
+	SHOPPER,   # Window-shops and pauses at storefronts
+	PERFORMER, # Dances on the spot with a little crowd around
+	PHONE,     # Drifts along while talking on a phone
 }
 
 ## Each traffic vehicle drives with an attitude of its own.
@@ -418,7 +423,52 @@ static func _retarget_rpm_walk(dst_skel: Skeleton3D, dst_path: NodePath) -> Anim
 
 ## Spawns one of the realistic Ready Player Me people walking the sidewalk with a retargeted
 ## walk cycle.
-func spawn_rpm_character(track_root: Node3D, scene: PackedScene, offset: float, lat: float, speed: float, dir: float, target_h: float, yaw_offset: float = 0.0) -> void:
+static func _persona_emote(persona: int, reacting: bool) -> String:
+	if reacting:
+		match persona:
+			Persona.TIMID: return "!"
+			Persona.CURIOUS: return "whoa"
+			Persona.FRIENDLY: return "hi!"
+			Persona.HURRIED: return "hey!"
+			Persona.TOURIST: return "photo!"
+			Persona.SHOPPER: return "ooh!"
+			Persona.PERFORMER: return "la la"
+			Persona.PHONE: return "..."
+			_: return ""
+	match persona:
+		Persona.TOURIST: return "photo?"
+		Persona.SHOPPER: return "sale?"
+		Persona.PERFORMER: return "la la"
+		Persona.PHONE: return "..."
+		Persona.HURRIED: return "huff"
+		_: return ""
+
+
+static func _persona_color(persona: int) -> Color:
+	match persona:
+		Persona.TIMID: return Color(1.0, 0.62, 0.62)
+		Persona.CURIOUS: return Color(0.62, 0.92, 1.0)
+		Persona.FRIENDLY: return Color(0.6, 1.0, 0.78)
+		Persona.HURRIED: return Color(1.0, 0.86, 0.5)
+		Persona.TOURIST: return Color(1.0, 0.72, 0.9)
+		Persona.SHOPPER: return Color(0.85, 0.75, 1.0)
+		Persona.PERFORMER: return Color(1.0, 0.8, 0.35)
+		Persona.PHONE: return Color(0.7, 0.85, 1.0)
+		_: return Color(1.0, 1.0, 1.0)
+
+
+func _set_emote(ac: Dictionary, text: String, duration: float) -> void:
+	var label: Label3D = ac.get("emote")
+	ac.emote_timer = 0.0
+	if text == "" or not is_instance_valid(label):
+		return
+	label.text = text
+	label.modulate = _persona_color(int(ac.get("persona", Persona.OBLIVIOUS)))
+	label.visible = true
+	ac.emote_timer = duration
+
+
+func spawn_rpm_character(track_root: Node3D, scene: PackedScene, offset: float, lat: float, speed: float, dir: float, target_h: float, yaw_offset: float = 0.0, persona: int = Persona.OBLIVIOUS) -> void:
 	if scene == null:
 		return
 	var raw := scene.instantiate() as Node3D
@@ -440,19 +490,41 @@ func spawn_rpm_character(track_root: Node3D, scene: PackedScene, offset: float, 
 			lib.add_animation("Walk", walk)
 			ap.add_animation_library("", lib)
 			ap.play("Walk", -1, clampf(speed / 1.35, 0.65, 1.3))
+	var label := Label3D.new()
+	label.name = "Emote"
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.font_size = 64
+	label.pixel_size = 0.0042
+	label.outline_size = 14
+	label.outline_modulate = Color(0.03, 0.02, 0.06, 1.0)
+	label.modulate = _persona_color(persona)
+	label.no_depth_test = false
+	label.position = Vector3(0.0, 2.18, 0.0)
+	label.visible = false
+	fitted.add_child(label)
 	_animated_chars.append({
 		"node": fitted,
 		"ap": ap,
 		"offset": offset,
 		"lat": lat,
+		"base_lat": lat,
 		"speed": speed,
+		"base_speed": speed,
 		"dir": dir,
 		"walk": "Walk",
 		"idle": "",
 		"wave": "",
 		"yaw_offset": yaw_offset,
+		"persona": persona,
+		"state": 0,
+		"state_timer": 0.0,
+		"pause_cd": randf_range(4.0, 14.0),
+		"pause_dur": 3.0,
+		"phase": randf() * TAU,
+		"emote": label,
+		"emote_timer": 0.0,
 		"react_timer": 0.0,
-		"react_cd": randf() * 6.0,
+		"react_cd": randf() * 8.0,
 	})
 
 
@@ -482,12 +554,22 @@ func spawn_animated_character(track_root: Node3D, scene: PackedScene, offset: fl
 		"ap": ap,
 		"offset": offset,
 		"lat": lat,
+		"base_lat": lat,
 		"speed": speed,
+		"base_speed": speed,
 		"dir": dir,
 		"walk": walk_name,
 		"idle": idle_name,
 		"wave": wave_name,
 		"yaw_offset": yaw_offset,
+		"persona": Persona.OBLIVIOUS,
+		"state": 0,
+		"state_timer": 0.0,
+		"pause_cd": 8.0,
+		"pause_dur": 3.0,
+		"phase": randf() * TAU,
+		"emote": null,
+		"emote_timer": 0.0,
 		"react_timer": 0.0,
 		"react_cd": randf() * 6.0,
 	})
@@ -1450,38 +1532,142 @@ func _process(delta: float) -> void:
 		b = b.rotated(b.z.normalized(), sway_angle)
 		node.transform = Transform3D(b.scaled(Vector3(sc, sc, sc)), world_pos)
 
-	# 5b. Animate skeletal characters (service droids / walkers): walk the sidewalk, idle, wave at the player.
+	# 5b. Skeletal pedestrians with individual lives: walking, window-shopping, phone calls,
+	# dancing, hurrying, and reacting to the player's car in character.
 	for ac in _animated_chars:
 		if bool(ac.get("dead", false)):
 			continue
 		var node = ac.node
 		if not is_instance_valid(node):
 			continue
-		var cur_o: float = fposmod(float(ac.offset) + float(ac.speed) * float(ac.dir) * delta, track_len)
-		ac.offset = cur_o
-		var xf: Transform3D = main_node.call("_track_transform", cur_o, 0.0)
-		var wp: Vector3 = xf * Vector3(float(ac.lat), 0.40, 0.0)
-		var heading: float = (0.0 if float(ac.dir) > 0.0 else 180.0) + float(ac.yaw_offset)
-		var b: Basis = xf.basis.rotated(xf.basis.y.normalized(), deg_to_rad(heading))
-		node.transform = Transform3D(b, wp)
-
+		var persona: int = int(ac.get("persona", Persona.OBLIVIOUS))
+		var base_speed: float = float(ac.get("base_speed", float(ac.speed)))
+		var base_lat: float = float(ac.get("base_lat", float(ac.lat)))
+		var side_sign: float = 1.0 if base_lat >= 0.0 else -1.0
 		var ap: AnimationPlayer = ac.ap
-		if not is_instance_valid(ap):
-			continue
-		# Make sure every character is animating once the world is live (some scenes finish
-		# entering the tree after the first play() call during the build).
-		if not ap.is_playing() and float(ac.react_timer) <= 0.0 and String(ac.walk) != "":
-			ap.play(String(ac.walk))
+		var phase: float = float(ac.get("phase", 0.0))
+		if float(ac.emote_timer) > 0.0:
+			ac.emote_timer = float(ac.emote_timer) - delta
 		if float(ac.react_cd) > 0.0:
 			ac.react_cd = float(ac.react_cd) - delta
-		if float(ac.react_timer) > 0.0:
-			ac.react_timer = float(ac.react_timer) - delta
-			if float(ac.react_timer) <= 0.0 and String(ac.walk) != "":
+
+		var state: int = int(ac.get("state", 0))
+		var dist_sq: float = node.global_position.distance_squared_to(player_pos)
+		var notice_sq := 225.0
+		match persona:
+			Persona.TIMID: notice_sq = 400.0
+			Persona.CURIOUS, Persona.FRIENDLY, Persona.TOURIST: notice_sq = 324.0
+			Persona.HURRIED: notice_sq = 144.0
+			Persona.OBLIVIOUS: notice_sq = 49.0
+			_: notice_sq = 196.0
+
+		# Notice the car and react in character.
+		if dist_sq < notice_sq and float(ac.react_cd) <= 0.0 and state != 2:
+			ac.react_cd = 9.0
+			ac.react_timer = 2.0
+			ac.state_timer = 0.0
+			ac.state = 2
+			state = 2
+			_set_emote(ac, _persona_emote(persona, true), 2.0)
+			if persona == Persona.TIMID:
+				ac.lat = base_lat + side_sign * 1.1 # jump back toward the buildings
+			if is_instance_valid(ap) and String(ac.walk) != "":
 				ap.play(String(ac.walk))
-		elif String(ac.wave) != "" and wp.distance_to(player_pos) < 20.0 and float(ac.react_cd) <= 0.0:
-			ac.react_timer = 2.2
-			ac.react_cd = 12.0
-			ap.play(String(ac.wave))
+				ap.seek(0.0, true)
+				ap.pause()
+
+		if state == 2:
+			# Stand and watch the car go by.
+			ac.state_timer = float(ac.state_timer) + delta
+			if float(ac.state_timer) >= float(ac.react_timer):
+				ac.state = 0
+				ac.state_timer = 0.0
+				if is_instance_valid(ap) and String(ac.walk) != "":
+					ap.play(String(ac.walk), -1, clampf(base_speed / 1.35, 0.65, 1.3))
+		elif state == 0:
+			# Everyday pauses: window-shopping, gawking, phoning, dancing.
+			ac.pause_cd = float(ac.pause_cd) - delta
+			if float(ac.pause_cd) <= 0.0 and persona != Persona.HURRIED:
+				ac.state = 1
+				ac.state_timer = 0.0
+				var dur := randf_range(2.2, 5.5)
+				ac.pause_dur = dur
+				ac.pause_cd = randf_range(9.0, 22.0)
+				_set_emote(ac, _persona_emote(persona, false), dur)
+				if is_instance_valid(ap) and String(ac.walk) != "":
+					if persona == Persona.PERFORMER:
+						ap.play(String(ac.walk), -1, 0.95)
+					else:
+						ap.play(String(ac.walk))
+						ap.seek(0.0, true)
+						ap.pause()
+			else:
+				ac.lat = move_toward(float(ac.lat), base_lat, 1.5 * delta)
+		else:
+			ac.state_timer = float(ac.state_timer) + delta
+			if float(ac.state_timer) >= float(ac.pause_dur):
+				ac.state = 0
+				ac.state_timer = 0.0
+				ac.pause_cd = randf_range(8.0, 18.0)
+				if is_instance_valid(ap) and String(ac.walk) != "":
+					ap.play(String(ac.walk), -1, clampf(base_speed / 1.35, 0.65, 1.3))
+
+		# Only walkers on the move advance along the sidewalk.
+		if int(ac.state) == 0:
+			ac.offset = fposmod(float(ac.offset) + base_speed * float(ac.dir) * delta, track_len)
+		var cur_o: float = float(ac.offset)
+		var xf: Transform3D = main_node.call("_track_transform", cur_o, 0.0)
+		var wp: Vector3 = xf * Vector3(float(ac.lat), 0.40, 0.0)
+
+		var st: int = int(ac.state)
+		var bob := 0.0
+		var extra_yaw := 0.0
+		var roll := 0.0
+		var lean := 0.0
+		var heading_deg: float = 0.0 if float(ac.dir) > 0.0 else 180.0
+		if st == 0:
+			var rate := 9.2 if persona == Persona.HURRIED else 7.4
+			bob = absf(sin(_time * rate + phase)) * (0.055 if persona == Persona.HURRIED else 0.04)
+			if persona == Persona.PERFORMER:
+				extra_yaw = sin(_time * 2.1 + phase) * 12.0
+		elif st == 1:
+			match persona:
+				Persona.SHOPPER:
+					heading_deg = 90.0 if side_sign < 0.0 else -90.0
+					lean = 0.1 * side_sign
+				Persona.TOURIST:
+					heading_deg = 90.0 if side_sign < 0.0 else -90.0
+					extra_yaw = sin(_time * 0.8 + phase) * 25.0
+				Persona.PHONE:
+					lean = 0.12
+					extra_yaw = sin(_time * 0.6 + phase) * 8.0
+				Persona.PERFORMER:
+					bob = absf(sin(_time * 6.2 + phase)) * 0.14
+					extra_yaw = sin(_time * 3.0 + phase) * 34.0
+					roll = sin(_time * 3.0 + phase) * 0.35
+				_:
+					extra_yaw = sin(_time * 0.9 + phase) * 10.0
+		else:
+			bob = absf(sin(_time * 9.0 + phase)) * 0.055
+
+		var look: Basis
+		if st == 2:
+			var tp: Vector3 = player_pos - wp
+			tp.y = 0.0
+			if tp.length_squared() > 0.01:
+				look = Basis.looking_at(-tp.normalized(), Vector3.UP)
+			else:
+				look = xf.basis.rotated(xf.basis.y.normalized(), deg_to_rad(heading_deg))
+		else:
+			look = xf.basis.rotated(xf.basis.y.normalized(), deg_to_rad(heading_deg + float(ac.yaw_offset) + extra_yaw))
+			look = look.rotated(look.z.normalized(), roll)
+			if lean != 0.0:
+				look = look.rotated(look.x.normalized(), lean)
+		node.global_transform = Transform3D(look, wp + Vector3.UP * bob)
+
+		var emote: Label3D = ac.get("emote")
+		if is_instance_valid(emote):
+			emote.visible = float(ac.emote_timer) > 0.0 and wp.distance_squared_to(player_pos) < 1600.0
 
 	# 6. Animate Autonomous Hovering Security Drones (Patrolling beats + scanning crowds/player)
 	for dr in _security_drones:

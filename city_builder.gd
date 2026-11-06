@@ -2510,9 +2510,22 @@ static func _build_animated_characters(main: Node, track_root: Node3D, living_ct
 		var side: float = 1.0 if rng.randf() < 0.5 else -1.0
 		var lat: float = side * (road_half + rng.randf_range(1.9, 3.2))
 		var dir: float = 1.0 if rng.randf() < 0.5 else -1.0
-		var speed: float = rng.randf_range(0.9, 1.6)
 		var person: PackedScene = CHAR_PEOPLE[i % CHAR_PEOPLE.size()]
-		living_ctrl.call("spawn_rpm_character", track_root, person, o, lat, speed, dir, 1.78, 0.0)
+		# Deal out daily-life personalities (indices match LivingCityController.Persona).
+		var persona: int = i % 9
+		var speed := 1.2
+		var target_h := rng.randf_range(1.66, 1.9)
+		match persona:
+			0: speed = rng.randf_range(1.0, 1.4)  # TIMID
+			1: speed = rng.randf_range(1.1, 1.6)  # CURIOUS
+			2: speed = rng.randf_range(1.2, 1.7)  # OBLIVIOUS
+			3: speed = rng.randf_range(1.0, 1.4)  # FRIENDLY
+			4: speed = rng.randf_range(2.1, 2.6)  # HURRIED
+			5: speed = rng.randf_range(0.8, 1.0)  # TOURIST
+			6: speed = rng.randf_range(0.9, 1.1)  # SHOPPER
+			7: speed = rng.randf_range(0.7, 1.0)  # PERFORMER
+			8: speed = rng.randf_range(0.8, 1.1)  # PHONE
+		living_ctrl.call("spawn_rpm_character", track_root, person, o, lat, speed, dir, target_h, 0.0, persona)
 		spawned += 1
 	print("CityBuilder: %d realistic people walking the sidewalks" % spawned)
 
