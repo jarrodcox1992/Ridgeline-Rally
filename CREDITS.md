@@ -97,3 +97,14 @@ The crowd and sidewalk walkers are **Ready Player Me** avatars (claudia, eric, n
 - `models/people/` holds static walking-pose meshes baked from those avatars for the instanced ambient crowd (see `dev_tools/bake_people.gd`, which must run with a window so the renderer registers the skeletons).
 
 All four people share the standard Ready Player Me skeleton, so one walk cycle drives every one of them.
+
+## Street-photo billboards
+
+The billboard screens around the city use these street photographs, all released under CC0 / public domain:
+
+- *Tokyo Street, nightlife. View* — https://www.rawpixel.com/image/8809241/photo-image-wallpaper-lights-neon (CC0)
+- *View Tokyo streets night trails* — https://www.rawpixel.com/image/5919437/photo-image-background-aesthetic-design (CC0)
+- *Busy Tokyo street* — https://www.rawpixel.com/image/6042306/busy-tokyo-street-free-public-domain-cc0-photo (CC0)
+- *Tokyo Street at Night* — https://www.rawpixel.com/image/5969844/tokyo-street-night (CC0)
+- *Yellow Cab New York Street* — https://www.rawpixel.com/image/8809243/photo-image-steam-smoke-public-domain (CC0)
+- *Crowd walks New York street* — https://www.rawpixel.com/image/6111394/photo-image-public-domain-person-woman (CC0)

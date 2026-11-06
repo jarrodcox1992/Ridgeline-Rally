@@ -1,0 +1,62 @@
+[
+  {
+    "file": "textures/street_photos/street_00.jpg",
+    "title": "Tokyo Street, nightlife. View",
+    "creator": null,
+    "source": "https://www.rawpixel.com/image/8809241/photo-image-wallpaper-lights-neon",
+    "license": "cc0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "width": 4896,
+    "height": 3264
+  },
+  {
+    "file": "textures/street_photos/street_01.jpg",
+    "title": "View Tokyo streets night trails",
+    "creator": null,
+    "source": "https://www.rawpixel.com/image/5919437/photo-image-background-aesthetic-design",
+    "license": "cc0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "width": 4460,
+    "height": 2974
+  },
+  {
+    "file": "textures/street_photos/street_02.jpg",
+    "title": "Busy Tokyo street",
+    "creator": null,
+    "source": "https://www.rawpixel.com/image/6042306/busy-tokyo-street-free-public-domain-cc0-photo",
+    "license": "cc0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "width": 5472,
+    "height": 3648
+  },
+  {
+    "file": "textures/street_photos/street_03.jpg",
+    "title": "Tokyo Street at Night",
+    "creator": null,
+    "source": "https://www.rawpixel.com/image/5969844/tokyo-street-night",
+    "license": "cc0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "width": 4896,
+    "height": 3264
+  },
+  {
+    "file": "textures/street_photos/street_04.jpg",
+    "title": "Yellow Cab New York Street",
+    "creator": null,
+    "source": "https://www.rawpixel.com/image/8809243/photo-image-steam-smoke-public-domain",
+    "license": "cc0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "width": 4000,
+    "height": 2667
+  },
+  {
+    "file": "textures/street_photos/street_05.jpg",
+    "title": "Crowd walks New York street",
+    "creator": null,
+    "source": "https://www.rawpixel.com/image/6111394/photo-image-public-domain-person-woman",
+    "license": "cc0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "width": 5518,
+    "height": 3645
+  }
+]

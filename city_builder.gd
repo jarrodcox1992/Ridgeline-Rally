@@ -30,6 +30,14 @@ const TEX_IRON_NOR := preload("res://textures/city_pbr/corrugated_iron_nor_gl.jp
 const TEX_STOREFRONT_RAMEN := preload("res://textures/city_pbr/storefront_ramen_interior.jpg")
 const TEX_BILLBOARD_SUPERCAR := preload("res://textures/city_pbr/neon_billboard_supercar.jpg")
 const TEX_BILLBOARD_ARCADE := preload("res://textures/city_pbr/neon_billboard_arcade.jpg")
+const STREET_PHOTOS: Array[Texture2D] = [
+	preload("res://textures/street_photos/street_00.jpg"),
+	preload("res://textures/street_photos/street_01.jpg"),
+	preload("res://textures/street_photos/street_02.jpg"),
+	preload("res://textures/street_photos/street_03.jpg"),
+	preload("res://textures/street_photos/street_04.jpg"),
+	preload("res://textures/street_photos/street_05.jpg"),
+]
 
 # Poly Haven Photo-Scanned 3D Urban Models (1:1 Metric GLTF)
 const PH_FIRE_HYDRANT := preload("res://models/polyhaven/fire_hydrant/fire_hydrant.gltf")
@@ -313,6 +321,7 @@ static func build_city(main: Node, track_root: Node3D) -> void:
 	_build_cyberpunk_skybridges_and_holoarches(main, track_root, rng, living_ctrl)
 	_build_waterfront_harbor_and_smokestacks(main, track_root, rng)
 	_build_neon_billboards(main, track_root, rng, living_ctrl)
+	_build_photo_billboards(main, track_root, rng)
 	_build_urban_soundscapes(main, track_root)
 	_build_city_street_grid(main, track_root, rng)
 	_build_grid_traffic(track_root, living_ctrl, rng)
@@ -904,6 +913,8 @@ static func _build_frontage_highrise(track_root: Node3D, xform: Transform3D, o: 
 	var led_col: Color = led_colors[count % led_colors.size()]
 	var sec_col: Color = led_colors[(count + 1) % led_colors.size()]
 	var bg_tex: Texture2D = TEX_BILLBOARD_SUPERCAR if (count % 2 == 0) else TEX_BILLBOARD_ARCADE
+	if not STREET_PHOTOS.is_empty() and count % 3 == 0:
+		bg_tex = STREET_PHOTOS[(count / 3) % STREET_PHOTOS.size()]
 	var h_billboard_mat := _make_cyber_billboard_mat(count % 4, led_col, sec_col, bg_tex, 2.2)
 	var v_billboard_mat := _make_cyber_billboard_mat((count + 1) % 4, sec_col, led_col, null, 2.4)
 	var face_rot_deg: float = 90.0 if side < 0 else -90.0
@@ -2204,6 +2215,81 @@ static func _build_neon_billboards(main: Node, track_root: Node3D, _rng: RandomN
 			living_ctrl.call("register_neon_light", neon_light, screen_mat, 1.8, float(i) * 0.37)
 			if i % 4 == 0:
 				living_ctrl.call("add_neon_hum_emitter", xform * Vector3(side * (road_half + 3.8), 3.2, 0.0))
+
+
+## Large real-photograph billboards along the ring road and the city street grid.
+static func _build_photo_billboards(main: Node, track_root: Node3D, rng: RandomNumberGenerator) -> void:
+	if STREET_PHOTOS.is_empty():
+		return
+	var frame_mat := StandardMaterial3D.new()
+	frame_mat.albedo_color = Color(0.05, 0.06, 0.08)
+	frame_mat.metallic = 0.6
+	frame_mat.roughness = 0.4
+	var made := 0
+
+	var track_len: float = float(main.get("track_length"))
+	var road_half: float = float(main.get("ROAD_HALF_WIDTH"))
+	var n_main := 12
+	for i in n_main:
+		var o: float = (float(i) + 0.5) * (track_len / float(n_main))
+		var xf: Transform3D = main.call("_track_transform", o, 0.0)
+		if xf.origin.y > 2.5:
+			continue
+		var side: float = 1.0 if (i % 2 == 0) else -1.0
+		var pos: Vector3 = xf * Vector3(side * (road_half + 4.2), 9.0, 0.0)
+		var basis: Basis = xf.basis.rotated(xf.basis.y.normalized(), deg_to_rad(-90.0 * side))
+		_add_photo_board(track_root, STREET_PHOTOS[i % STREET_PHOTOS.size()], pos, basis, frame_mat)
+		made += 1
+
+	# A few on the city street grid too.
+	var coords := [-640.0, -380.0, -120.0, 140.0, 400.0, 660.0]
+	for i in 8:
+		var on_x: bool = i % 2 == 0
+		var c: float = coords[i % coords.size()]
+		var along: float = rng.randf_range(-650.0, 650.0)
+		var side: float = 1.0 if rng.randf() < 0.5 else -1.0
+		var pos2 := Vector3(along, 8.5, c + side * 9.0) if on_x else Vector3(c + side * 9.0, 8.5, along)
+		var normal := Vector3(0.0, 0.0, -side) if on_x else Vector3(-side, 0.0, 0.0)
+		var basis2 := Basis(Vector3.UP, atan2(normal.x, normal.z))
+		_add_photo_board(track_root, STREET_PHOTOS[(i + 2) % STREET_PHOTOS.size()], pos2, basis2, frame_mat)
+		made += 1
+	print("CityBuilder: %d street-photo billboards" % made)
+
+
+static func _add_photo_board(track_root: Node3D, photo: Texture2D, pos: Vector3, basis: Basis, frame_mat: Material) -> void:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = photo
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var quad := QuadMesh.new()
+	quad.size = Vector2(10.0, 5.6)
+	quad.material = mat
+	var mi := MeshInstance3D.new()
+	mi.mesh = quad
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.transform = Transform3D(basis, pos)
+	track_root.add_child(mi)
+
+	var frame := BoxMesh.new()
+	frame.size = Vector3(10.6, 6.2, 0.3)
+	var fmi := MeshInstance3D.new()
+	fmi.mesh = frame
+	fmi.material_override = frame_mat
+	fmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	fmi.transform = Transform3D(basis, pos - basis.z.normalized() * 0.2)
+	track_root.add_child(fmi)
+
+	var board_bottom: float = pos.y - 2.8
+	var ground_y := 0.4
+	var post_h: float = maxf(1.0, board_bottom - ground_y)
+	for sx in [-3.6, 3.6]:
+		var post := BoxMesh.new()
+		post.size = Vector3(0.25, post_h, 0.25)
+		var pmi := MeshInstance3D.new()
+		pmi.mesh = post
+		pmi.material_override = frame_mat
+		pmi.transform = Transform3D(basis, pos + basis.x.normalized() * sx + Vector3.UP * (ground_y + post_h * 0.5 - pos.y))
+		track_root.add_child(pmi)
 
 
 static func _build_urban_soundscapes(_main: Node, track_root: Node3D) -> void:
