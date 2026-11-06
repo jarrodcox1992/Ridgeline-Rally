@@ -9,7 +9,6 @@ const DIFFICULTY_NAMES := ["Easy", "Normal", "Hard"]
 var _main: Node
 var _panel: PanelContainer
 var _resume: Button
-var _track: OptionButton
 var _quality: OptionButton
 var _difficulty: OptionButton
 var _time_of_day: OptionButton
@@ -26,8 +25,6 @@ func setup(main: Node) -> void:
 	_build()
 	var settings := ConfigFile.new()
 	settings.load(SETTINGS_PATH)
-	var track_idx: int = clampi(int(settings.get_value("race", "track", _main.current_track_index)), 0, maxi(0, _track.item_count - 1))
-	_track.select(track_idx)
 	var quality: int = settings.get_value("graphics", "quality", 1)
 	var fullscreen: bool = settings.get_value("graphics", "fullscreen", false)
 	var difficulty: int = settings.get_value("race", "difficulty", 1)
@@ -65,8 +62,6 @@ func _set_paused(paused: bool) -> void:
 	# Players keep looping while paused, so silence the mix instead.
 	AudioServer.set_bus_mute(0, paused)
 	if paused:
-		if _track:
-			_track.select(_main.current_track_index)
 		_resume.grab_focus()
 
 
@@ -74,7 +69,6 @@ func _save() -> void:
 	var settings := ConfigFile.new()
 	settings.set_value("graphics", "quality", _quality.selected)
 	settings.set_value("graphics", "fullscreen", _fullscreen.button_pressed)
-	settings.set_value("race", "track", _track.selected)
 	settings.set_value("race", "difficulty", _difficulty.selected)
 	settings.set_value("race", "time_of_day", _time_of_day.selected)
 	if _abs_btn:
@@ -138,9 +132,6 @@ func _build() -> void:
 		_set_paused(false)
 		get_tree().reload_current_scene())
 
-	_track = _add_choice(column, "Track", _main.TRACK_DATA.map(func(t): return t.name), func(index: int):
-		_main.load_track(index)
-		_save())
 	_difficulty = _add_choice(column, "AI difficulty", DIFFICULTY_NAMES, func(index: int):
 		_main.set_difficulty(index)
 		_save())

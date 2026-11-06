@@ -11,59 +11,11 @@ const CityBuilderScript := preload("res://city_builder.gd")
 const RoadRepairControllerScript := preload("res://road_repair_controller.gd")
 
 ## Multi-Track Cyberpunk Metropolis & High-Speed Expressway Circuits
+## The single city map. All roads are built into this one world; there is no track switching.
 const CITY_TRACKS: Array[Dictionary] = [
 	{
-		"name": "Neo-Veridia // Sector-9",
-		"desc": "Flagship Cyberpunk Metropolis: Corporate Core, Multi-Level Sky-Expressway Overpass, Hyper-Straight Bypass & Cyber-Docklands",
-		"file": "res://tracks/CityDowntownLoop.csv",
-		"span": 1120.0,
-		"step": 4,
-		"elev_amp": 0.0,
-		"elev_type": "flat",
-		"district": "NEO-VERIDIA // SECTOR-9",
-		"road_title": "VERIDIA GRAND EXPRESSWAY",
-		"speed_limit": "50 MPH",
-	},
-	{
-		"name": "Veridia Sky-Expressway",
-		"desc": "Sweeping Multi-Tiered Elevated Highway Overpasses, High-Speed Viaduct Straights & Interchange Ramps",
-		"file": "res://tracks/CitySkylineExpressway.csv",
-		"span": 1520.0,
-		"step": 3,
-		"elev_amp": 16.0,
-		"elev_type": "multi_overpass",
-		"district": "SKY-EXPRESSWAY // INTERCHANGE",
-		"road_title": "ELEVATED SKYWAY LOOP",
-		"speed_limit": "75 MPH",
-	},
-	{
-		"name": "Cyber-Harbor",
-		"desc": "Long Waterfront Terminal Straightaways, Elevated Port Flyovers & Industrial Container Quaysides",
-		"file": "res://tracks/CityWaterfront.csv",
-		"span": 1480.0,
-		"step": 3,
-		"elev_amp": 12.0,
-		"elev_type": "flyover",
-		"district": "CYBER-DOCKLANDS // HARBOR",
-		"road_title": "HARBOR TERMINAL PKWY",
-		"speed_limit": "70 MPH",
-	},
-	{
-		"name": "Synapse Midtown",
-		"desc": "Dense Multi-Block Urban Grid with Alternate Bypass Avenues, Overpass Crossings & 90-Degree Chicanes",
-		"file": "res://tracks/CityMidtownGrid.csv",
-		"span": 1360.0,
-		"step": 2,
-		"elev_amp": 14.0,
-		"elev_type": "multi_overpass",
-		"district": "SYNAPSE MIDTOWN // GRID-04",
-		"road_title": "SYNAPSE CROSS-AVENUE",
-		"speed_limit": "60 MPH",
-	},
-	{
-		"hidden": false, # Set to false once the clean loop passes the drive test (see ROADMAP known issues).
-		"name": "Sector-9 Autobahn A-95",
-		"desc": "Smooth 1.76 km Perimeter Circuit: Flowing Bends, Long Straightaways & Clean Flat Loop",
+		"name": "Neo-Veridia",
+		"desc": "One unified cyberpunk metropolis with a main ring circuit and a network of city streets",
 		"file": "res://tracks/AutobahnA95.csv",
 		"span": 1760.0,
 		"step": 3,
@@ -72,8 +24,8 @@ const CITY_TRACKS: Array[Dictionary] = [
 		"branches": false,
 		"elev_amp": 0.0,
 		"elev_type": "flat",
-		"district": "SECTOR-9 // PERIMETER AUTOBAHN",
-		"road_title": "AUTOBAHN A-95 EXPRESS",
+		"district": "NEO-VERIDIA // CITY",
+		"road_title": "VERIDIA RING ROAD",
 		"speed_limit": "UNLIMITED",
 	},
 ]
@@ -588,8 +540,6 @@ func _physics_process(delta: float) -> void:
 		if is_instance_valid(c):
 			c.update_slipstream(cars)
 
-	if Input.is_action_just_pressed("next_track"):
-		load_track((current_track_index + 1) % TRACK_DATA.size())
 	if Input.is_action_just_pressed("repair_road"):
 		_trigger_nearest_road_repair()
 	if Input.is_action_just_pressed("reset_car"):
@@ -791,7 +741,6 @@ func _setup_input() -> void:
 	_add_action("steer_right", [KEY_D, KEY_RIGHT], [], [[JOY_AXIS_LEFT_X, 1.0]])
 	_add_action("handbrake", [KEY_SPACE], [JOY_BUTTON_A], [])
 	_add_action("reset_car", [KEY_R], [JOY_BUTTON_Y], [])
-	_add_action("next_track", [KEY_T], [], [])
 	_add_action("camera", [KEY_C], [JOY_BUTTON_BACK], [])
 	_add_action("headlights", [KEY_H], [JOY_BUTTON_DPAD_UP], [])
 	_add_action("horn", [KEY_G], [JOY_BUTTON_B], [])
@@ -2316,7 +2265,7 @@ func _build_hud() -> void:
 	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	var help := _make_label(layer, 15)
-	help.text = "W/S: drive    A/D: steer    Space: handbrake    K: repair road    R: reset    T: next track    C: camera    B: look back    H: headlights    V: photo mode    F: fps    Esc: menu"
+	help.text = "W/S: drive    A/D: steer    Space: handbrake    K: repair road    R: reset    C: camera    B: look back    H: headlights    V: photo mode    F: fps    Esc: menu"
 	help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	help.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	help.offset_left = 28.0

@@ -94,6 +94,11 @@ Found by driving the race through scripted runs, then fixed:
 
 
 
+## One unified map with a city street grid
+
+- There is now a single map (`Neo-Veridia`). The T-key track cycling and the pause-menu Track selector are gone.
+- A 14-street grid of flat asphalt roads with collision is laid across the map, buildings on those roads are cleared, and the ring circuit remains the race course. Cars can cross the kerb to roam the grid.
+
 ## Track 4 redesign
 
 - Track 4 now uses a smooth, flat, procedural loop (no alternate routes or guardrails) instead of the surveyed Alpine autobahn data. It completes a lap in the automated drive test at ~150 km/h and is playable.

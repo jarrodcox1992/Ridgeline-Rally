@@ -310,6 +310,7 @@ static func build_city(main: Node, track_root: Node3D) -> void:
 	_build_waterfront_harbor_and_smokestacks(main, track_root, rng)
 	_build_neon_billboards(main, track_root, rng, living_ctrl)
 	_build_urban_soundscapes(main, track_root)
+	_build_city_street_grid(main, track_root, rng)
 	_build_dense_crowd(main, track_root, rng)
 	_build_animated_characters(main, track_root, living_ctrl, rng)
 	_purge_carriageway_intrusions(main, track_root)
@@ -453,7 +454,7 @@ static func _build_sidewalks_and_curbs(main: Node, track_root: Node3D) -> void:
 		sw_strip.path_rotation = CSGPolygon3D.PATH_ROTATION_PATH_FOLLOW
 		sw_strip.smooth_faces = true
 		sw_strip.material = sidewalk_mat
-		sw_strip.use_collision = true
+		sw_strip.use_collision = false # cars can cross the kerb onto the city street grid
 		track_root.add_child(sw_strip)
 		if track_path:
 			sw_strip.path_node = sw_strip.get_path_to(track_path)
@@ -2274,6 +2275,102 @@ static func _init_industrial_materials() -> Array[ShaderMaterial]:
 		m.set_shader_parameter("use_pbr_tex", true)
 		mats.append(m)
 	return mats
+
+
+## A network of flat city streets laid across the single map: a grid of asphalt roads with
+## collision, so the one map has many roads to drive. Buildings that sit on a street are removed.
+static func _build_city_street_grid(main: Node, track_root: Node3D, rng: RandomNumberGenerator) -> void:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = load("res://textures/asphalt_track/asphalt_track_diff_2k.jpg")
+	mat.albedo_color = Color(0.40, 0.42, 0.46)
+	mat.normal_enabled = true
+	mat.normal_texture = load("res://textures/asphalt_track/asphalt_track_nor_gl_2k.jpg")
+	mat.normal_scale = 1.2
+	mat.roughness = 0.72
+	mat.metallic = 0.2
+	mat.uv1_triplanar = true
+	mat.uv1_world_triplanar = true
+	mat.uv1_scale = Vector3.ONE * 0.5
+	var line_mat := StandardMaterial3D.new()
+	line_mat.albedo_color = Color(0.88, 0.72, 0.16)
+	line_mat.roughness = 0.55
+	line_mat.emission_enabled = true
+	line_mat.emission = Color(0.25, 0.2, 0.05)
+	line_mat.emission_energy_multiplier = 0.4
+
+	var width := 14.0
+	var thick := 0.20
+	var extent := 900.0
+	var step := 260.0
+	var rects: Array[AABB] = []
+
+	# East-west streets.
+	var z: float = -extent
+	while z <= extent:
+		var length_x: float = extent * 2.0
+		var pos := Vector3(0.0, thick * 0.5, z)
+		main.call("_add_prop", Vector3(length_x, thick, width), pos, Basis(), mat)
+		_add_street_line(track_root, Vector3(0.0, thick + 0.005, z), Vector3(length_x, 0.02, 0.5), line_mat)
+		rects.append(AABB(Vector3(-extent, 0.0, z - width * 0.5 - 11.0), Vector3(length_x, 6.0, width + 22.0)))
+		z += step
+
+	# North-south streets.
+	var x: float = -extent
+	while x <= extent:
+		var length_z: float = extent * 2.0
+		var pos2 := Vector3(x, thick * 0.5, 0.0)
+		main.call("_add_prop", Vector3(width, thick, length_z), pos2, Basis(), mat)
+		_add_street_line(track_root, Vector3(x, thick + 0.005, 0.0), Vector3(0.5, 0.02, length_z), line_mat)
+		rects.append(AABB(Vector3(x - width * 0.5 - 11.0, 0.0, -extent), Vector3(width + 22.0, 6.0, length_z)))
+		x += step
+
+	_purge_buildings_on_streets(track_root, rects)
+	print("CityBuilder: built a city street grid (%d streets)" % rects.size())
+
+
+static func _add_street_line(track_root: Node3D, pos: Vector3, size: Vector3, mat: Material) -> void:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	mi.mesh = bm
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = pos
+	track_root.add_child(mi)
+
+
+static func _purge_buildings_on_streets(track_root: Node3D, rects: Array[AABB]) -> void:
+	var doomed: Array[Node] = []
+	for body in track_root.get_children():
+		if not (body is StaticBody3D):
+			continue
+		var shape_node: CollisionShape3D = null
+		for c in body.get_children():
+			if c is CollisionShape3D and (c as CollisionShape3D).shape is BoxShape3D:
+				shape_node = c
+				break
+		if shape_node == null:
+			continue
+		var box: BoxShape3D = shape_node.shape
+		if box.size.y < 8.0:
+			continue # not a building
+		var gt: Transform3D = (body as Node3D).global_transform * shape_node.transform
+		var centre := Vector3(gt.origin.x, 3.0, gt.origin.z)
+		var half := Vector3(box.size.x * 0.5, 3.0, box.size.z * 0.5)
+		var bb := AABB(centre - half, half * 2.0)
+		var hit := false
+		for r in rects:
+			if r.intersects(bb):
+				hit = true
+				break
+		if not hit:
+			continue
+		doomed.append(body)
+		for m in track_root.get_children():
+			if m is MeshInstance3D and (m as Node3D).global_position.distance_to((body as Node3D).global_position) < 0.02:
+				doomed.append(m)
+	for n in doomed:
+		n.queue_free()
 
 
 ## Skeletal-animated characters (CC0 service droids + CC BY walkers) that stride along the
