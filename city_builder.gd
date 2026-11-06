@@ -2231,11 +2231,11 @@ static func _build_photo_billboards(main: Node, track_root: Node3D, rng: RandomN
 	var road_half: float = float(main.get("ROAD_HALF_WIDTH"))
 	var n_main := 12
 	for i in n_main:
-		var o: float = 18.0 if i == 0 else (float(i) + 0.5) * (track_len / float(n_main))
+		var o: float = 50.0 if i == 0 else (float(i) + 0.5) * (track_len / float(n_main))
 		var xf: Transform3D = main.call("_track_transform", o, 0.0)
 		if xf.origin.y > 2.5:
 			continue
-		var side: float = 1.0 if (i % 2 == 0) else -1.0
+		var side: float = -1.0 if i == 0 else (1.0 if (i % 2 == 0) else -1.0)
 		var pos: Vector3 = xf * Vector3(side * (road_half + 4.2), 9.0, 0.0)
 		var basis: Basis = xf.basis.rotated(xf.basis.y.normalized(), deg_to_rad(-90.0 * side))
 		_add_photo_board(track_root, STREET_PHOTOS[i % STREET_PHOTOS.size()], pos, basis, frame_mat)
