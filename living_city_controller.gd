@@ -930,7 +930,9 @@ func honk_from(pos: Vector3) -> void:
 			_:
 				pass
 	for veh in _traffic_vehicles:
-		var vn: Node3D = veh.node
+		if bool(veh.get("crashed", false)):
+			continue
+		var vn = veh.node
 		if is_instance_valid(vn) and vn.global_position.distance_squared_to(pos) < 1600.0: # 40m
 			var hp: AudioStreamPlayer3D = veh.horn_player
 			if is_instance_valid(hp) and not hp.playing:
@@ -966,7 +968,7 @@ func _update_crash_impacts(player_car: Node3D, delta: float) -> void:
 	for veh in _traffic_vehicles:
 		if bool(veh.get("crashed", false)):
 			continue
-		var n: Node3D = veh.node
+		var n = veh.node
 		if not is_instance_valid(n):
 			continue
 		var to: Vector3 = n.global_position - ppos
@@ -979,7 +981,7 @@ func _update_crash_impacts(player_car: Node3D, delta: float) -> void:
 	for veh in _grid_traffic:
 		if bool(veh.get("crashed", false)):
 			continue
-		var n2: Node3D = veh.node
+		var n2 = veh.node
 		if not is_instance_valid(n2):
 			continue
 		var to2: Vector3 = n2.global_position - ppos
@@ -992,7 +994,7 @@ func _update_crash_impacts(player_car: Node3D, delta: float) -> void:
 	for ac in _animated_chars:
 		if bool(ac.get("dead", false)):
 			continue
-		var wn: Node3D = ac.node
+		var wn = ac.node
 		if not is_instance_valid(wn):
 			continue
 		var to3: Vector3 = wn.global_position - ppos
@@ -1199,7 +1201,9 @@ func _process(delta: float) -> void:
 
 	# 4. Animate Autonomous Traffic Fleet (Buses stopping at stations, Red-Light queuing, Weaving Couriers & Horns)
 	for veh in _traffic_vehicles:
-		var node: Node3D = veh.node
+		if bool(veh.get("crashed", false)):
+			continue
+		var node = veh.node
 		if not is_instance_valid(node):
 			continue
 		var cur_o: float = float(veh.offset)
@@ -1278,7 +1282,9 @@ func _process(delta: float) -> void:
 
 	# 4b. City-grid traffic: cars cruising the street grid laid across the one map.
 	for veh in _grid_traffic:
-		var gnode: Node3D = veh.node
+		if bool(veh.get("crashed", false)):
+			continue
+		var gnode = veh.node
 		if not is_instance_valid(gnode):
 			continue
 		var axis: int = int(veh.axis)
@@ -1436,7 +1442,9 @@ func _process(delta: float) -> void:
 
 	# 5b. Animate skeletal characters (service droids / walkers): walk the sidewalk, idle, wave at the player.
 	for ac in _animated_chars:
-		var node: Node3D = ac.node
+		if bool(ac.get("dead", false)):
+			continue
+		var node = ac.node
 		if not is_instance_valid(node):
 			continue
 		var cur_o: float = fposmod(float(ac.offset) + float(ac.speed) * float(ac.dir) * delta, track_len)
