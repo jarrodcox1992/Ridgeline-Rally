@@ -82,6 +82,8 @@ var _traffic_vehicles: Array[Dictionary] = []
 var _grid_traffic: Array[Dictionary] = []
 var _crowd_spots: Array[Dictionary] = []
 var _fx_root: Node3D
+var _crash_prev_pos := Vector3.ZERO
+var _crash_prev_valid := false
 const _CRASH_SPEED := 3.2
 var _traffic_signals: Array[Dictionary] = []
 var _horn_stream: AudioStreamWAV
@@ -963,6 +965,12 @@ func _update_crash_impacts(player_car: Node3D, delta: float) -> void:
 	if vel.length() < _CRASH_SPEED:
 		return
 	var ppos: Vector3 = player_car.global_position
+	# Sweep the impact test along this frame's travel so fast cars can't tunnel through targets.
+	var prev: Vector3 = _crash_prev_pos
+	if not _crash_prev_valid or prev.distance_squared_to(ppos) > 625.0:
+		prev = ppos
+	_crash_prev_pos = ppos
+	_crash_prev_valid = true
 
 	# Traffic on the main ring road.
 	for veh in _traffic_vehicles:
@@ -971,8 +979,8 @@ func _update_crash_impacts(player_car: Node3D, delta: float) -> void:
 		var n = veh.node
 		if not is_instance_valid(n):
 			continue
-		var to: Vector3 = n.global_position - ppos
-		if to.length_squared() < 7.3 and vel.dot(to) > 0.0:
+		var d2: float = Geometry3D.get_closest_point_to_segment(n.global_position, prev, ppos).distance_squared_to(n.global_position)
+		if d2 < 7.3:
 			veh["crashed"] = true
 			_explode_vehicle(n, vel)
 			player_car.linear_velocity = vel * 0.82
@@ -984,8 +992,8 @@ func _update_crash_impacts(player_car: Node3D, delta: float) -> void:
 		var n2 = veh.node
 		if not is_instance_valid(n2):
 			continue
-		var to2: Vector3 = n2.global_position - ppos
-		if to2.length_squared() < 7.3 and vel.dot(to2) > 0.0:
+		var d22: float = Geometry3D.get_closest_point_to_segment(n2.global_position, prev, ppos).distance_squared_to(n2.global_position)
+		if d22 < 7.3:
 			veh["crashed"] = true
 			_explode_vehicle(n2, vel)
 			player_car.linear_velocity = vel * 0.82
@@ -998,7 +1006,8 @@ func _update_crash_impacts(player_car: Node3D, delta: float) -> void:
 		if not is_instance_valid(wn):
 			continue
 		var to3: Vector3 = wn.global_position - ppos
-		if to3.length_squared() < 3.4:
+		var d23: float = Geometry3D.get_closest_point_to_segment(wn.global_position, prev, ppos).distance_squared_to(wn.global_position)
+		if d23 < 3.4:
 			ac["dead"] = true
 			_splatter(wn.global_position + Vector3.UP * 0.9, vel, wn)
 			player_car.linear_velocity = vel * 0.96
@@ -1007,8 +1016,9 @@ func _update_crash_impacts(player_car: Node3D, delta: float) -> void:
 	for spot in _crowd_spots:
 		if bool(spot.get("dead", false)):
 			continue
-		var to4: Vector3 = (spot.pos as Vector3) - ppos
-		if to4.length_squared() < 2.6:
+		var spot_pos: Vector3 = spot.pos
+		var d24: float = Geometry3D.get_closest_point_to_segment(spot_pos, prev, ppos).distance_squared_to(spot_pos)
+		if d24 < 2.6:
 			spot["dead"] = true
 			var mm: MultiMesh = spot.mm
 			if is_instance_valid(mm) and int(spot.idx) < mm.instance_count:
