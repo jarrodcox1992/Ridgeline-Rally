@@ -66,6 +66,10 @@ const MAX_STEER := 0.6
 const STEER_GRIP := 1.15 * 9.8
 const STEER_HEADROOM := 1.7
 const REAR_GRIP_HANDBRAKE := 1.25
+const REAR_GRIP_DRIFT := 1.0 # rear grip while the handbrake is used as a drift brake
+const DRIFT_REAR_BRAKE := 0.8 # only lightly drag the rears so a drift keeps its speed
+const DRIFT_STEER_BOOST := 1.5 # extra steering lock for counter-steer
+const DRIFT_MIN_SPEED := 5.0 # m/s (about 18 km/h)
 const WHEEL_RADIUS := 0.384
 # Wheel centres in the model, keyed by the model's wheel node names.
 const WHEELS := {
@@ -218,6 +222,7 @@ var _all_wheels: Array[VehicleWheel3D] = []
 var headlights_on := false
 ## Handbrake plus throttle at a standstill: front wheels locked, rears spinning in smoke.
 var burnout := false
+var drifting := false
 signal collision_impact(strength: float)
 
 var on_curb := false
@@ -362,10 +367,16 @@ func _physics_process(delta: float) -> void:
 	# cornering as the tires can give, so the car doesn't snap into a spin.
 	var grip_steer := atan(WHEELBASE * STEER_GRIP / maxf(speed * speed, 1.0)) * STEER_HEADROOM
 	var max_steer := clampf(grip_steer, 0.05, MAX_STEER)
+	drifting = handbrake_on and speed > DRIFT_MIN_SPEED and not frozen
+	if drifting:
+		# Counter-steer needs real lock, not the speed-limited cornering lock.
+		max_steer = clampf(max_steer * DRIFT_STEER_BOOST, 0.05, MAX_STEER)
 	var target_steer := steer_input * max_steer
 	# Turn in more gently at speed, but always let the wheel come back to centre quickly.
 	var returning := absf(target_steer) < absf(steering) or signf(target_steer) != signf(steering)
 	var rate := 3.5 if returning else lerpf(2.5, 0.8, clampf(speed / 50.0, 0.0, 1.0))
+	if drifting:
+		rate = 4.5
 	steering = move_toward(steering, target_steer, delta * rate)
 
 	var force := 0.0
@@ -394,7 +405,7 @@ func _physics_process(delta: float) -> void:
 
 	# Active Traction Control System (TCS)
 	tcs_active = false
-	if tcs_enabled and force > 250.0 and not burnout and speed < 130.0:
+	if tcs_enabled and force > 250.0 and not burnout and not handbrake_on and speed < 130.0:
 		var slip_detected := false
 		for rw in _rear_wheels:
 			if rw.is_in_contact() and (1.0 - rw.get_skidinfo()) > 0.32:
@@ -422,25 +433,49 @@ func _physics_process(delta: float) -> void:
 		decel *= (0.68 + 0.32 * sin(_abs_phase * TAU))
 
 	burnout = handbrake_on and accel_input > 0.5 and speed < 6.0
-	for wheel in _rear_wheels:
-		wheel.wheel_friction_slip = (REAR_GRIP_HANDBRAKE if handbrake_on else REAR_GRIP) * road_traction_multiplier
-		if burnout:
+	if burnout:
+		drifting = false
+
+	# Reset the per-wheel overrides each frame; the body's engine_force still drives normally.
+	for wheel in _all_wheels:
+		wheel.brake = 0.0
+		wheel.wheel_friction_slip = (FRONT_GRIP if wheel.use_as_steering else REAR_GRIP) * road_traction_multiplier
+
+	if burnout:
+		for wheel in _rear_wheels:
 			# Rears get full power on almost no grip, so they spin instead of driving the car.
 			wheel.wheel_friction_slip = 0.35 * road_traction_multiplier
-			wheel.brake = 0.0
-			wheel.engine_force = MAX_DRIVE_FORCE
-		elif handbrake_on:
-			wheel.brake = HANDBRAKE
-			wheel.engine_force = 0.0
-	for wheel in _all_wheels:
-		if wheel.use_as_steering:
-			wheel.wheel_friction_slip = FRONT_GRIP * road_traction_multiplier
-	if burnout:
 		for wheel in _all_wheels:
 			if wheel.use_as_steering:
 				wheel.brake = 60.0
 		decel = 0.0
 		throttle = accel_input
+		engine_force = MAX_DRIVE_FORCE * 2.0
+	elif drifting:
+		# As the slide grows, feed rear grip back in so it settles into a controllable angle
+		# instead of spinning all the way around.
+		var slip_deg := 0.0
+		if speed > 2.0:
+			slip_deg = rad_to_deg(acos(clampf(linear_velocity.normalized().dot(global_basis.z), -1.0, 1.0)))
+		var rear_grip := REAR_GRIP_DRIFT
+		if slip_deg > 28.0:
+			rear_grip = lerpf(REAR_GRIP_DRIFT, 1.55, clampf((slip_deg - 28.0) / 30.0, 0.0, 1.0))
+		if slip_deg > 38.0:
+			# Cap the slide angle so a held handbrake carves a drift instead of pirouetting.
+			var speed_now := linear_velocity.length()
+			var blend := clampf((slip_deg - 38.0) / 40.0, 0.0, 1.0) * clampf(delta * 12.0, 0.0, 0.6)
+			linear_velocity = linear_velocity.normalized().slerp(global_basis.z.normalized(), blend) * speed_now
+		for wheel in _rear_wheels:
+			# Keep the rear tires rolling: locking them scrubs off all the speed.
+			wheel.wheel_friction_slip = rear_grip * road_traction_multiplier
+			wheel.brake = DRIFT_REAR_BRAKE
+		for wheel in _all_wheels:
+			if wheel.use_as_steering:
+				wheel.wheel_friction_slip = FRONT_GRIP * 1.06 * road_traction_multiplier
+	elif handbrake_on:
+		for wheel in _rear_wheels:
+			wheel.wheel_friction_slip = REAR_GRIP_HANDBRAKE * road_traction_multiplier
+			wheel.brake = HANDBRAKE
 
 	# Acceleration & G-force Telemetry Calculation
 	var accel_vec := (linear_velocity - _prev_velocity) / maxf(delta, 0.001)

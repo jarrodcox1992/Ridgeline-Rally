@@ -4,7 +4,7 @@ extends Node3D
 
 const MAX_SEGMENTS := 3000
 const MARK_WIDTH := 0.26
-const SLIP_THRESHOLD := 0.35 # how far below full grip (1 - skidinfo) a tire must slip to leave marks
+const SLIP_THRESHOLD := 0.3 # how far below full grip (1 - skidinfo) a tire must slip to leave marks
 const MIN_SPEED := 3.0
 const MIN_SEGMENT := 0.25
 const SMOKE_THRESHOLD := 0.45
@@ -15,6 +15,7 @@ var _last_points: Array[Vector3] = []
 var _marking: Array[bool] = []
 var _marks: MultiMesh
 var _next_mark := 0
+var _burn_tick := 0.0
 var _smoke: Dictionary = {} # VehicleWheel3D -> GPUParticles3D
 
 
@@ -32,14 +33,23 @@ func setup(car: VehicleBody3D, wheels: Array[VehicleWheel3D], smoking_wheels: Ar
 	_warm_up()
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	var speed := _car.linear_velocity.length()
+	_burn_tick += delta
+	var burn_mark: bool = _car.burnout and _burn_tick > 0.05
 	for i in _wheels.size():
 		var wheel := _wheels[i]
 		var slip := 1.0 - wheel.get_skidinfo()
-		var sliding := wheel.is_in_contact() and slip > SLIP_THRESHOLD and speed > MIN_SPEED
+		var burning: bool = _car.burnout and _smoke.has(wheel) and wheel.is_in_contact()
+		var sliding := wheel.is_in_contact() and (burning or (slip > SLIP_THRESHOLD and speed > MIN_SPEED))
 		var point := wheel.get_contact_point() + wheel.get_contact_normal() * 0.02 if sliding else Vector3.ZERO
-		if sliding and _marking[i]:
+		if burning:
+			# A stationary burnout still cooks a patch into the tarmac.
+			if burn_mark:
+				var across := _car.global_basis.x.normalized() * 0.13
+				_add_mark(point - across, point + across, wheel.get_contact_normal(), 0.9)
+			_last_points[i] = point
+		elif sliding and _marking[i]:
 			var gap := point.distance_to(_last_points[i])
 			if gap > 3.0:
 				_last_points[i] = point # the car was reset; don't draw a line across the map
@@ -58,6 +68,8 @@ func _physics_process(_delta: float) -> void:
 			smoke.emitting = amount > 0.05
 			smoke.amount_ratio = amount
 			smoke.global_position = wheel.global_position - Vector3.UP * wheel.wheel_radius * 0.6
+	if burn_mark:
+		_burn_tick = 0.0
 
 
 ## Graphics drivers compile an effect's shaders the first time it is drawn, which stalls a

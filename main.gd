@@ -2265,7 +2265,7 @@ func _build_hud() -> void:
 	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	var help := _make_label(layer, 15)
-	help.text = "W/S: drive    A/D: steer    Space: handbrake    K: repair road    R: reset    C: camera    B: look back    H: headlights    V: photo mode    F: fps    Esc: menu"
+	help.text = "W/S: drive    A/D: steer    Space: handbrake / drift    Space+W: burnout    K: repair road    R: reset    C: camera    B: look back    H: headlights    V: photo mode    F: fps    Esc: menu"
 	help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	help.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	help.offset_left = 28.0
