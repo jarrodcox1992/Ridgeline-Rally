@@ -2231,7 +2231,7 @@ static func _build_photo_billboards(main: Node, track_root: Node3D, rng: RandomN
 	var road_half: float = float(main.get("ROAD_HALF_WIDTH"))
 	var n_main := 12
 	for i in n_main:
-		var o: float = (float(i) + 0.5) * (track_len / float(n_main))
+		var o: float = 18.0 if i == 0 else (float(i) + 0.5) * (track_len / float(n_main))
 		var xf: Transform3D = main.call("_track_transform", o, 0.0)
 		if xf.origin.y > 2.5:
 			continue
