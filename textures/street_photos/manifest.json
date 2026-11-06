@@ -58,5 +58,47 @@
     "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
     "width": 5518,
     "height": 3645
+  },
+  {
+    "file": "textures/street_photos/street_06.jpg",
+    "title": "Shibuya Crossing 2020-04-19 (2)",
+    "creator": null,
+    "source": "https://commons.wikimedia.org/w/index.php?curid=89261679",
+    "license": "cc0"
+  },
+  {
+    "file": "textures/street_photos/street_07.jpg",
+    "title": "Shibuya Crossing 2020-04-19 (1)",
+    "creator": null,
+    "source": "https://commons.wikimedia.org/w/index.php?curid=89261611",
+    "license": "cc0"
+  },
+  {
+    "file": "textures/street_photos/street_08.jpg",
+    "title": "Shibuya Crossing, Tokyo",
+    "creator": null,
+    "source": "https://www.rawpixel.com/image/4026029/shibuya-crossing-tokyo",
+    "license": "cc0"
+  },
+  {
+    "file": "textures/street_photos/street_09.jpg",
+    "title": "Shibuya Crossing, pedestrians, Tokyo, Japan",
+    "creator": null,
+    "source": "https://www.rawpixel.com/image/6113341/photo-image-public-domain-black-people",
+    "license": "cc0"
+  },
+  {
+    "file": "textures/street_photos/street_10.jpg",
+    "title": "Shibuya crossing, Japan tourist destination",
+    "creator": null,
+    "source": "https://www.rawpixel.com/image/8809217/photo-image-people-public-domain",
+    "license": "cc0"
+  },
+  {
+    "file": "textures/street_photos/street_11.jpg",
+    "title": "Shibuya Crossing Tokyo, Japan -",
+    "creator": null,
+    "source": "https://www.rawpixel.com/image/6111493/shibuya-crossing-tokyo-japan-unknown-date",
+    "license": "cc0"
   }
 ]

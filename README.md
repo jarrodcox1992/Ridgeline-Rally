@@ -33,6 +33,7 @@ Every rival and every person on the street has their own character.
 - **Pedestrians:** nine personalities — timid (jumps clear early), curious (leans out to watch), oblivious (keeps walking), friendly (stops and waves), hurried (power-walks and sidesteps late), tourists (stop to gawk and shoot photos), shoppers (window-shop facing the storefronts), performers (dance on the spot), phone-talkers (wander slowly, heads down). They pause, emote, and react to your car in character.
 - **Traffic:** polite (eases over to let you past), aggressive (speeds up and honks), tourist (slow drifters), courier (weaving scooters).
 - **Realistic people:** 160 fully animated Ready Player Me men and women walk the sidewalks in a retargeted walk cycle, each with their own daily routine, alongside 1,200 textured people in the ambient crowd.
+- **High-detail surfaces:** 4K PBR asphalt, paving and gravel, 2K/4K brick, concrete and corrugated-iron facades, 12 real street-photo billboards and 5 photographed shop interiors.
 - **Street-photo billboards:** 20 large screens around the ring and grid show real CC0 street photographs.
 - **Crash destruction:** hit traffic and it bursts into debris, fire and smoke; hit people and they splatter.
 - **City-grid traffic:** taxis and kei trucks cruise the street grid, so the extra roads are alive too.

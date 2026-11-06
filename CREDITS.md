@@ -39,6 +39,7 @@ All from [Poly Haven](https://polyhaven.com/textures), CC0 (public domain):
 - "Rock Face 03" by Dario Barresi and Rico Cilliers
 - "Snow 02" by Rob Tuytel
 - "Asphalt Track" by Dimitrios Savva
+- "Rectangular Paving", "Tarred Gravel", "Concrete Wall 006", "Red Brick 03" and "Corrugated Iron", upgraded to 2K/4K PBR sets for the roads, sidewalks and building facades
 
 ## Trees
 
@@ -108,3 +109,18 @@ The billboard screens around the city use these street photographs, all released
 - *Tokyo Street at Night* — https://www.rawpixel.com/image/5969844/tokyo-street-night (CC0)
 - *Yellow Cab New York Street* — https://www.rawpixel.com/image/8809243/photo-image-steam-smoke-public-domain (CC0)
 - *Crowd walks New York street* — https://www.rawpixel.com/image/6111394/photo-image-public-domain-person-woman (CC0)
+- *Shibuya Crossing 2020-04-19 (2)* — https://commons.wikimedia.org/w/index.php?curid=89261679 (CC0)
+- *Shibuya Crossing 2020-04-19 (1)* — https://commons.wikimedia.org/w/index.php?curid=89261611 (CC0)
+- *Shibuya Crossing, Tokyo* — https://www.rawpixel.com/image/4026029/shibuya-crossing-tokyo (CC0)
+- *Shibuya Crossing, pedestrians, Tokyo, Japan* — https://www.rawpixel.com/image/6113341/photo-image-public-domain-black-people (CC0)
+- *Shibuya crossing, Japan tourist destination* — https://www.rawpixel.com/image/8809217/photo-image-people-public-domain (CC0)
+- *Shibuya Crossing Tokyo, Japan -* — https://www.rawpixel.com/image/6111493/shibuya-crossing-tokyo-japan-unknown-date (CC0)
+
+## Shop interiors
+
+The ground-floor shop windows use these CC0 / public-domain interior photographs:
+
+- *Hijo De Su Madre (restaurant), interior* — https://commons.wikimedia.org/w/index.php?curid=152942394 (CC0)
+- *Free modern restaurant interior image* — https://www.rawpixel.com/image/5905263/photo-image-public-domain-table-room (CC0)
+- *Fancy restaurant interior* — https://www.rawpixel.com/image/447750/free-photo-image-restaurant-table-dinner-chair (CC0)
+- *Vimala's Curryblossom Cafe - interior* — https://commons.wikimedia.org/w/index.php?curid=80191035 (CC0)

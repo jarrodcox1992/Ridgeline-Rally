@@ -37,6 +37,19 @@ const STREET_PHOTOS: Array[Texture2D] = [
 	preload("res://textures/street_photos/street_03.jpg"),
 	preload("res://textures/street_photos/street_04.jpg"),
 	preload("res://textures/street_photos/street_05.jpg"),
+	preload("res://textures/street_photos/street_06.jpg"),
+	preload("res://textures/street_photos/street_07.jpg"),
+	preload("res://textures/street_photos/street_08.jpg"),
+	preload("res://textures/street_photos/street_09.jpg"),
+	preload("res://textures/street_photos/street_10.jpg"),
+	preload("res://textures/street_photos/street_11.jpg"),
+]
+const TEX_STOREFRONTS: Array[Texture2D] = [
+	preload("res://textures/city_pbr/storefront_ramen_interior.jpg"),
+	preload("res://textures/city_pbr/shopfront_01.jpg"),
+	preload("res://textures/city_pbr/shopfront_02.jpg"),
+	preload("res://textures/city_pbr/shopfront_03.jpg"),
+	preload("res://textures/city_pbr/shopfront_04.jpg"),
 ]
 
 # Poly Haven Photo-Scanned 3D Urban Models (1:1 Metric GLTF)
@@ -2310,7 +2323,8 @@ static func _build_urban_soundscapes(_main: Node, track_root: Node3D) -> void:
 
 static func _init_glass_materials() -> Array[ShaderMaterial]:
 	var mats: Array[ShaderMaterial] = []
-	for p in FACADE_PALETTES:
+	for i in FACADE_PALETTES.size():
+		var p: Dictionary = FACADE_PALETTES[i]
 		var m := ShaderMaterial.new()
 		m.shader = SKYSCRAPER_SHADER
 		m.set_shader_parameter("facade_color", p.facade)
@@ -2318,7 +2332,8 @@ static func _init_glass_materials() -> Array[ShaderMaterial]:
 		m.set_shader_parameter("lit_color_1", p.window_lit)
 		m.set_shader_parameter("concrete_albedo_tex", TEX_CONCRETE_DIFF)
 		m.set_shader_parameter("concrete_normal_tex", TEX_CONCRETE_NOR)
-		m.set_shader_parameter("storefront_tex", TEX_STOREFRONT_RAMEN)
+		# Rotate real photographed shop interiors so every block's ground floor looks different.
+		m.set_shader_parameter("storefront_tex", TEX_STOREFRONTS[i % TEX_STOREFRONTS.size()])
 		m.set_shader_parameter("use_pbr_tex", true)
 		mats.append(m)
 	return mats
