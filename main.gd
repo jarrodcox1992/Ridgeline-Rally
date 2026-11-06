@@ -570,6 +570,15 @@ func _physics_process(delta: float) -> void:
 		var lateral_dist := absf((t_xform.affine_inverse() * car.global_position).x)
 		var on_rumble: bool = lateral_dist > 9.0 and lateral_dist < 9.6
 		(car as CarScript).on_curb = on_rumble
+		# Hint when the car is wedged off the road (e.g. against a sidewalk prop): R resets it to the road.
+		if car.linear_velocity.length() < 0.5 and lateral_dist > ROAD_HALF_WIDTH:
+			_stuck_time += delta
+			if _stuck_time > 3.0 and not _stuck_hinted:
+				_stuck_hinted = true
+				_show_message("Stuck? Press R to reset to the road", 4.0)
+		else:
+			_stuck_time = 0.0
+			_stuck_hinted = false
 		if on_rumble:
 			var speed := car.linear_velocity.length()
 			camera_shake = maxf(camera_shake, clampf(speed / 30.0, 0.0, 1.0) * 0.045)
@@ -1997,6 +2006,8 @@ func _race_rank(racer: VehicleBody3D) -> float:
 
 
 var _last_grounded_offset: float = -1.0
+var _stuck_time: float = 0.0
+var _stuck_hinted: bool = false
 
 func _reset_car() -> void:
 	flipped_time = 0.0
