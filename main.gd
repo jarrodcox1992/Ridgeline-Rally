@@ -61,6 +61,7 @@ const CITY_TRACKS: Array[Dictionary] = [
 		"speed_limit": "60 MPH",
 	},
 	{
+		"hidden": true, # Not drivable end to end yet; see ROADMAP known issues.
 		"name": "Sector-9 Autobahn A-95",
 		"desc": "Massive 1.76 km Span Ultra-High-Speed Perimeter Highway with Long Straightaways & Elevated Viaducts",
 		"file": "res://tracks/AutobahnA95.csv",
@@ -429,6 +430,9 @@ func _init() -> void:
 func _init_tracks() -> void:
 	TRACK_DATA.clear()
 	for circuit in CITY_TRACKS:
+		# Hidden circuits are kept in the data but not offered in the track list (see ROADMAP known issues).
+		if circuit.get("hidden", false):
+			continue
 		var pts := _load_osm_track(circuit.file, circuit)
 		TRACK_DATA.append({
 			"name": circuit.name,
