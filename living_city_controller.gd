@@ -74,6 +74,7 @@ var _awning_offsets: Array[float] = []
 var _security_drones: Array[Dictionary] = []
 
 # 5. Autonomous Traffic Fleet & Intersection Signal Network
+var _animated_chars: Array[Dictionary] = []
 var _traffic_vehicles: Array[Dictionary] = []
 var _traffic_signals: Array[Dictionary] = []
 var _horn_stream: AudioStreamWAV
@@ -333,6 +334,71 @@ func register_pedestrian(node: Node3D, offset: float, lat: float, speed: float, 
 		"watch_timer": 0.0,
 		"wave_timer": 0.0,
 		"persona": persona
+	})
+
+
+## Fits an imported character (GLB) to a target height in metres, centred on its feet.
+static func _fit_character_height(inst: Node3D, target_h: float) -> Node3D:
+	var wrapper := Node3D.new()
+	var pivot := Node3D.new()
+	wrapper.add_child(pivot)
+	pivot.add_child(inst)
+	var st := {"has": false, "min": Vector3.ZERO, "max": Vector3.ZERO}
+	_compute_local_aabb(inst, Transform3D.IDENTITY, st)
+	if not st["has"]:
+		return wrapper
+	var mn: Vector3 = st["min"]
+	var mx: Vector3 = st["max"]
+	var h: float = maxf(0.05, mx.y - mn.y)
+	var sc: float = target_h / h
+	var cx: float = (mn.x + mx.x) * 0.5
+	var cz: float = (mn.z + mx.z) * 0.5
+	pivot.transform = Transform3D(Basis().scaled(Vector3(sc, sc, sc)), Vector3(-cx * sc, -mn.y * sc, -cz * sc))
+	return wrapper
+
+
+static func _pick_anim(anims: Array, names: Array) -> String:
+	for want in names:
+		for a in anims:
+			if String(a).to_lower() == String(want).to_lower():
+				return String(a)
+	return ""
+
+
+## Spawns a fully skeletal-animated character that walks the sidewalk, idles, and waves at the
+## player when they drive past. `scene` should be an imported GLB with an AnimationPlayer.
+func spawn_animated_character(track_root: Node3D, scene: PackedScene, offset: float, lat: float, speed: float, dir: float, target_h: float, yaw_offset: float = 0.0) -> void:
+	if scene == null:
+		return
+	var raw := scene.instantiate() as Node3D
+	if raw == null:
+		return
+	var fitted := _fit_character_height(raw, target_h)
+	track_root.add_child(fitted)
+	var ap: AnimationPlayer = null
+	for n in fitted.find_children("*", "AnimationPlayer", true, false):
+		ap = n
+		break
+	var anims: Array = ap.get_animation_list() if ap else []
+	var walk_name := _pick_anim(anims, ["Walking", "Walk", "Running", "Animation"])
+	var idle_name := _pick_anim(anims, ["Idle", "Standing", "Sitting"])
+	var wave_name := _pick_anim(anims, ["Wave", "ThumbsUp", "Yes"])
+	if ap and walk_name != "":
+		# Defer the first play: the scene is still finishing entering the tree during world build.
+		ap.call_deferred("play", walk_name)
+	_animated_chars.append({
+		"node": fitted,
+		"ap": ap,
+		"offset": offset,
+		"lat": lat,
+		"speed": speed,
+		"dir": dir,
+		"walk": walk_name,
+		"idle": idle_name,
+		"wave": wave_name,
+		"yaw_offset": yaw_offset,
+		"react_timer": 0.0,
+		"react_cd": randf() * 6.0,
 	})
 
 
@@ -1033,6 +1099,37 @@ func _process(delta: float) -> void:
 		var b: Basis = xform.basis.rotated(xform.basis.y.normalized(), deg_to_rad(heading_deg))
 		b = b.rotated(b.z.normalized(), sway_angle)
 		node.transform = Transform3D(b.scaled(Vector3(sc, sc, sc)), world_pos)
+
+	# 5b. Animate skeletal characters (service droids / walkers): walk the sidewalk, idle, wave at the player.
+	for ac in _animated_chars:
+		var node: Node3D = ac.node
+		if not is_instance_valid(node):
+			continue
+		var cur_o: float = fposmod(float(ac.offset) + float(ac.speed) * float(ac.dir) * delta, track_len)
+		ac.offset = cur_o
+		var xf: Transform3D = main_node.call("_track_transform", cur_o, 0.0)
+		var wp: Vector3 = xf * Vector3(float(ac.lat), 0.40, 0.0)
+		var heading: float = (0.0 if float(ac.dir) > 0.0 else 180.0) + float(ac.yaw_offset)
+		var b: Basis = xf.basis.rotated(xf.basis.y.normalized(), deg_to_rad(heading))
+		node.transform = Transform3D(b, wp)
+
+		var ap: AnimationPlayer = ac.ap
+		if not is_instance_valid(ap):
+			continue
+		# Make sure every character is animating once the world is live (some scenes finish
+		# entering the tree after the first play() call during the build).
+		if not ap.is_playing() and float(ac.react_timer) <= 0.0 and String(ac.walk) != "":
+			ap.play(String(ac.walk))
+		if float(ac.react_cd) > 0.0:
+			ac.react_cd = float(ac.react_cd) - delta
+		if float(ac.react_timer) > 0.0:
+			ac.react_timer = float(ac.react_timer) - delta
+			if float(ac.react_timer) <= 0.0 and String(ac.walk) != "":
+				ap.play(String(ac.walk))
+		elif String(ac.wave) != "" and wp.distance_to(player_pos) < 20.0 and float(ac.react_cd) <= 0.0:
+			ac.react_timer = 2.2
+			ac.react_cd = 12.0
+			ap.play(String(ac.wave))
 
 	# 6. Animate Autonomous Hovering Security Drones (Patrolling beats + scanning crowds/player)
 	for dr in _security_drones:

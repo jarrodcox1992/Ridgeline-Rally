@@ -114,3 +114,7 @@ Found by driving the race through scripted runs, then fixed:
 - Added about 5,000 ambient people (four body types, instanced with `MultiMeshInstance3D` and a cheap sway shader) placed in personality-based clusters along the sidewalks and plazas: timid back from the road, curious at the kerb, oblivious on the pavement, friendly in the plazas. Four draw calls, no shadows, negligible CPU.
 - `CROWD_SCALE` env var scales the population for profiling.
 
+## Life-like animated characters
+
+- Added 120 skeletal-animated characters from the internet (CC0 RobotExpressive droid and CC BY 4.0 CesiumMan walker; credited in CREDITS.md). They walk the sidewalks, idle, and wave at the player, giving the city real articulated motion. Their animations are started/kept running from the update loop so they never freeze after world build.
+

@@ -67,6 +67,8 @@ const HD_PED_CLAUDIA := preload("res://models/city_hd/claudia.glb")
 const HD_PED_ERIC := preload("res://models/city_hd/eric.glb")
 const HD_PED_NATHAN := preload("res://models/city_hd/nathan.glb")
 const HD_PED_CARLA := preload("res://models/city_hd/carla.glb")
+const CHAR_ROBOT := preload("res://models/characters/robot_expressive.glb")
+const CHAR_WALKER := preload("res://models/characters/walker_cesium.glb")
 const HD_CITY_BUS := preload("res://models/city_hd/isuzu_erga_mio_bus_clean.glb")
 const HD_FIRE_TRUCK := preload("res://models/city_hd/fire_truck.glb")
 const HD_TAXI := preload("res://models/city_hd/2001_toyota_crown_comfort_s10_clean.glb")
@@ -309,6 +311,7 @@ static func build_city(main: Node, track_root: Node3D) -> void:
 	_build_neon_billboards(main, track_root, rng, living_ctrl)
 	_build_urban_soundscapes(main, track_root)
 	_build_dense_crowd(main, track_root, rng)
+	_build_animated_characters(main, track_root, living_ctrl, rng)
 	_purge_carriageway_intrusions(main, track_root)
 	print("CityBuilder: Neo-Veridia // Sector-9 Cyberpunk Metropolis fully operational!")
 
@@ -2271,6 +2274,32 @@ static func _init_industrial_materials() -> Array[ShaderMaterial]:
 		m.set_shader_parameter("use_pbr_tex", true)
 		mats.append(m)
 	return mats
+
+
+## Skeletal-animated characters (CC0 service droids + CC BY walkers) that stride along the
+## sidewalks, idle, and wave at the player. These give the city real articulated motion.
+static func _build_animated_characters(main: Node, track_root: Node3D, living_ctrl: Node, rng: RandomNumberGenerator) -> void:
+	if living_ctrl == null or not living_ctrl.has_method("spawn_animated_character"):
+		return
+	var track_len: float = float(main.get("track_length"))
+	var road_half: float = float(main.get("ROAD_HALF_WIDTH"))
+	var count := 120
+	var spawned := 0
+	for i in count:
+		var o: float = rng.randf() * track_len
+		var xf: Transform3D = main.call("_track_transform", o, 0.0)
+		if xf.origin.y > 2.5:
+			continue
+		var side: float = 1.0 if rng.randf() < 0.5 else -1.0
+		var lat: float = side * (road_half + rng.randf_range(1.9, 3.2))
+		var dir: float = 1.0 if rng.randf() < 0.5 else -1.0
+		var speed: float = rng.randf_range(0.9, 1.6)
+		if i % 2 == 0:
+			living_ctrl.call("spawn_animated_character", track_root, CHAR_ROBOT, o, lat, speed, dir, 1.75, 180.0)
+		else:
+			living_ctrl.call("spawn_animated_character", track_root, CHAR_WALKER, o, lat, speed, dir, 1.8, 0.0)
+		spawned += 1
+	print("CityBuilder: %d animated characters on patrol" % spawned)
 
 
 ## ---------------------------------------------------------------------------
