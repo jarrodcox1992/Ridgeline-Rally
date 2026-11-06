@@ -2231,14 +2231,16 @@ static func _build_photo_billboards(main: Node, track_root: Node3D, rng: RandomN
 	var road_half: float = float(main.get("ROAD_HALF_WIDTH"))
 	var n_main := 12
 	for i in n_main:
-		var o: float = 50.0 if i == 0 else (float(i) + 0.5) * (track_len / float(n_main))
+		var o: float = (float(i) + 0.5) * (track_len / float(n_main))
+		if i == 0:
+			o = -80.0
 		var xf: Transform3D = main.call("_track_transform", o, 0.0)
 		if xf.origin.y > 2.5:
 			continue
-		var side: float = -1.0 if i == 0 else (1.0 if (i % 2 == 0) else -1.0)
+		var side: float = 1.0 if (i % 2 == 0) else -1.0
 		var pos: Vector3 = xf * Vector3(side * (road_half + 4.2), 9.0, 0.0)
 		var basis: Basis = xf.basis.rotated(xf.basis.y.normalized(), deg_to_rad(-90.0 * side))
-		_add_photo_board(track_root, STREET_PHOTOS[i % STREET_PHOTOS.size()], pos, basis, frame_mat)
+		_add_photo_board(track_root, STREET_PHOTOS[i % STREET_PHOTOS.size()], pos, basis, frame_mat, made)
 		made += 1
 
 	# A few on the city street grid too.
@@ -2251,12 +2253,12 @@ static func _build_photo_billboards(main: Node, track_root: Node3D, rng: RandomN
 		var pos2 := Vector3(along, 8.5, c + side * 9.0) if on_x else Vector3(c + side * 9.0, 8.5, along)
 		var normal := Vector3(0.0, 0.0, -side) if on_x else Vector3(-side, 0.0, 0.0)
 		var basis2 := Basis(Vector3.UP, atan2(normal.x, normal.z))
-		_add_photo_board(track_root, STREET_PHOTOS[(i + 2) % STREET_PHOTOS.size()], pos2, basis2, frame_mat)
+		_add_photo_board(track_root, STREET_PHOTOS[(i + 2) % STREET_PHOTOS.size()], pos2, basis2, frame_mat, made)
 		made += 1
 	print("CityBuilder: %d street-photo billboards" % made)
 
 
-static func _add_photo_board(track_root: Node3D, photo: Texture2D, pos: Vector3, basis: Basis, frame_mat: Material) -> void:
+static func _add_photo_board(track_root: Node3D, photo: Texture2D, pos: Vector3, basis: Basis, frame_mat: Material, id: int) -> void:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = photo
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -2265,6 +2267,7 @@ static func _add_photo_board(track_root: Node3D, photo: Texture2D, pos: Vector3,
 	quad.size = Vector2(10.0, 5.6)
 	quad.material = mat
 	var mi := MeshInstance3D.new()
+	mi.name = "StreetPhotoBoard_%d" % id
 	mi.mesh = quad
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.transform = Transform3D(basis, pos)
