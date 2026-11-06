@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://loyyb83dpdf4"
-path="res://.godot/imported/robot_expressive.glb-be1476ffe2fb13159851f28305bc10ff.scn"
+uid="uid://ddas4k0q2ease"
+path="res://.godot/imported/carla_low.glb-9ce227200ec5510618946d27987dfbdd.scn"
 
 [deps]
 
-source_file="res://models/characters/robot_expressive.glb"
-dest_files=["res://.godot/imported/robot_expressive.glb-be1476ffe2fb13159851f28305bc10ff.scn"]
+source_file="res://models/people_src/carla_low.glb"
+dest_files=["res://.godot/imported/carla_low.glb-9ce227200ec5510618946d27987dfbdd.scn"]
 
 [params]
 

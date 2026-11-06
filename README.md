@@ -32,8 +32,8 @@ Every rival and every person on the street has their own character.
 - **Rival drivers:** Blaze (aggressive — defends hard and fights back when overtaken), Pearl (technician — clean lines and gives you room), Red (wildcard — brakes late and taunts you).
 - **Pedestrians:** timid (jumps clear early), curious (leans out to watch), oblivious (keeps walking), friendly (stops to wave you through).
 - **Traffic:** polite (eases over to let you past), aggressive (speeds up and honks), tourist (slow drifters), courier (weaving scooters).
-- **Animated characters:** 120 skeletal-animated walkers and service droids (CC0 robot, CC BY walker) stride the sidewalks, idle, and wave as you pass.
-- **The crowd:** about 5,000 extra people fill the sidewalks and plazas, gathered in small groups — queues at bus stops, friends in plazas, onlookers at the kerb. Each group has a personality that decides where they stand and how they sway.
+- **Realistic people:** 160 fully animated Ready Player Me men and women walk the sidewalks in a retargeted walk cycle, alongside 1,200 textured people in the ambient crowd.
+- **The crowd:** about 1,200 extra people fill the sidewalks and plazas, gathered in small groups — queues at bus stops, friends in plazas, onlookers at the kerb. Each group has a personality that decides where they stand.
 - Press **G** / gamepad **B** to sound the horn: nearby pedestrians react by personality and traffic honks back.
 
 ## Files

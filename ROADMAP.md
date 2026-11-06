@@ -116,10 +116,10 @@ Found by driving the race through scripted runs, then fixed:
 
 ## Thriving city crowd
 
-- Added about 5,000 ambient people (four body types, instanced with `MultiMeshInstance3D` and a cheap sway shader) placed in personality-based clusters along the sidewalks and plazas: timid back from the road, curious at the kerb, oblivious on the pavement, friendly in the plazas. Four draw calls, no shadows, negligible CPU.
+- The crowd is now built from four realistic Ready Player Me people baked into walking-pose meshes (1,700 verts each after decimation) and instanced with `MultiMeshInstance3D`, placed in personality-based clusters along the sidewalks and plazas: timid back from the road, curious at the kerb, oblivious on the pavement, friendly in the plazas.
 - `CROWD_SCALE` env var scales the population for profiling.
 
 ## Life-like animated characters
 
-- Added 120 skeletal-animated characters from the internet (CC0 RobotExpressive droid and CC BY 4.0 CesiumMan walker; credited in CREDITS.md). They walk the sidewalks, idle, and wave at the player, giving the city real articulated motion. Their animations are started/kept running from the update loop so they never freeze after world build.
+- Added 160 skeletal-animated Ready Player Me men and women (downloaded and decimated with glTF-Transform; credited in CREDITS.md). One walk cycle from nathan is retargeted across all four avatars by bone index, so they stride the sidewalks facing their direction of travel. Their animations are started/kept running from the update loop so they never freeze after world build.
 

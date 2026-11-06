@@ -67,8 +67,12 @@ const HD_PED_CLAUDIA := preload("res://models/city_hd/claudia.glb")
 const HD_PED_ERIC := preload("res://models/city_hd/eric.glb")
 const HD_PED_NATHAN := preload("res://models/city_hd/nathan.glb")
 const HD_PED_CARLA := preload("res://models/city_hd/carla.glb")
-const CHAR_ROBOT := preload("res://models/characters/robot_expressive.glb")
-const CHAR_WALKER := preload("res://models/characters/walker_cesium.glb")
+const CHAR_PEOPLE: Array[PackedScene] = [
+	preload("res://models/people_src/claudia_low.glb"),
+	preload("res://models/people_src/eric_low.glb"),
+	preload("res://models/people_src/nathan_low.glb"),
+	preload("res://models/people_src/carla_low.glb"),
+]
 const HD_CITY_BUS := preload("res://models/city_hd/isuzu_erga_mio_bus_clean.glb")
 const HD_FIRE_TRUCK := preload("res://models/city_hd/fire_truck.glb")
 const HD_TAXI := preload("res://models/city_hd/2001_toyota_crown_comfort_s10_clean.glb")
@@ -2376,11 +2380,14 @@ static func _purge_buildings_on_streets(track_root: Node3D, rects: Array[AABB]) 
 ## Skeletal-animated characters (CC0 service droids + CC BY walkers) that stride along the
 ## sidewalks, idle, and wave at the player. These give the city real articulated motion.
 static func _build_animated_characters(main: Node, track_root: Node3D, living_ctrl: Node, rng: RandomNumberGenerator) -> void:
-	if living_ctrl == null or not living_ctrl.has_method("spawn_animated_character"):
+	if living_ctrl == null or not living_ctrl.has_method("spawn_rpm_character"):
 		return
 	var track_len: float = float(main.get("track_length"))
 	var road_half: float = float(main.get("ROAD_HALF_WIDTH"))
-	var count := 120
+	var walker_scale := 1.0
+	if OS.get_environment("WALKER_SCALE") != "":
+		walker_scale = maxf(0.0, float(OS.get_environment("WALKER_SCALE")))
+	var count := int(160.0 * walker_scale)
 	var spawned := 0
 	for i in count:
 		var o: float = rng.randf() * track_len
@@ -2391,12 +2398,10 @@ static func _build_animated_characters(main: Node, track_root: Node3D, living_ct
 		var lat: float = side * (road_half + rng.randf_range(1.9, 3.2))
 		var dir: float = 1.0 if rng.randf() < 0.5 else -1.0
 		var speed: float = rng.randf_range(0.9, 1.6)
-		if i % 2 == 0:
-			living_ctrl.call("spawn_animated_character", track_root, CHAR_ROBOT, o, lat, speed, dir, 1.75, 180.0)
-		else:
-			living_ctrl.call("spawn_animated_character", track_root, CHAR_WALKER, o, lat, speed, dir, 1.8, 0.0)
+		var person: PackedScene = CHAR_PEOPLE[i % CHAR_PEOPLE.size()]
+		living_ctrl.call("spawn_rpm_character", track_root, person, o, lat, speed, dir, 1.78, 0.0)
 		spawned += 1
-	print("CityBuilder: %d animated characters on patrol" % spawned)
+	print("CityBuilder: %d realistic people walking the sidewalks" % spawned)
 
 
 ## ---------------------------------------------------------------------------
@@ -2463,26 +2468,33 @@ static func _build_dense_crowd(main: Node, track_root: Node3D, rng: RandomNumber
 	if track_len < 200.0:
 		return
 
+	# Realistic baked people (Ready Player Me) in a natural walking pose. We use the baked
+	# static meshes so thousands of textured people stay cheap; fall back to the procedural
+	# humanoid if the baked resources are missing.
+	var people_paths := [
+		"res://models/people/claudia_pose.res",
+		"res://models/people/eric_pose.res",
+		"res://models/people/nathan_pose.res",
+		"res://models/people/carla_pose.res",
+	]
+	var variants: Array = []
+	var realistic := true
+	for pp in people_paths:
+		if ResourceLoader.exists(pp):
+			variants.append([load(pp), 300, 0.0095])
+		else:
+			realistic = false
 	var shader := Shader.new()
 	shader.code = CROWD_SHADER
 	var mat := ShaderMaterial.new()
 	mat.shader = shader
-
-	# Clothing palette: muted city tones with a few bright accents.
-	var palette: Array[Color] = [
-		Color(0.10, 0.11, 0.15), Color(0.20, 0.22, 0.28), Color(0.35, 0.34, 0.30),
-		Color(0.55, 0.52, 0.47), Color(0.14, 0.26, 0.40), Color(0.45, 0.12, 0.16),
-		Color(0.12, 0.35, 0.28), Color(0.62, 0.58, 0.55), Color(0.30, 0.18, 0.34),
-		Color(0.70, 0.45, 0.18),
-	]
-
-	# Four body types, ~1,250 people each -> about 5,000 people in total.
-	var variants: Array = [
-		[_build_crowd_mesh(0.20, 0.95, 0.105), 1250],
-		[_build_crowd_mesh(0.26, 1.02, 0.120), 1250],
-		[_build_crowd_mesh(0.22, 0.78, 0.100), 1250],
-		[_build_crowd_mesh(0.16, 0.62, 0.090), 1250],
-	]
+	if not realistic:
+		variants = [
+			[_build_crowd_mesh(0.20, 0.95, 0.105), 1250, 1.0],
+			[_build_crowd_mesh(0.26, 1.02, 0.120), 1250, 1.0],
+			[_build_crowd_mesh(0.22, 0.78, 0.100), 1250, 1.0],
+			[_build_crowd_mesh(0.16, 0.62, 0.090), 1250, 1.0],
+		]
 
 	# CROWD_SCALE env var scales the population (handy for profiling; 1.0 is the full city).
 	var crowd_scale := 1.0
@@ -2491,18 +2503,20 @@ static func _build_dense_crowd(main: Node, track_root: Node3D, rng: RandomNumber
 
 	var total := 0
 	for vi in variants.size():
-		var mesh: ArrayMesh = variants[vi][0]
-		var count: int = int(variants[vi][1] * crowd_scale)
+		var mesh: Mesh = variants[vi][0]
+		var count: int = int(int(variants[vi][1]) * crowd_scale)
+		var mesh_scale: float = float(variants[vi][2])
+		if count <= 0 or mesh == null:
+			continue
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.use_custom_data = true
 		mm.mesh = mesh
 		mm.instance_count = count
 		var mmi := MultiMeshInstance3D.new()
 		mmi.name = "Crowd_%d" % vi
 		mmi.multimesh = mm
-		mmi.material_override = mat
+		if not realistic:
+			mmi.material_override = mat
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		track_root.add_child(mmi)
 
@@ -2540,16 +2554,13 @@ static func _build_dense_crowd(main: Node, track_root: Node3D, rng: RandomNumber
 
 				var pos: Vector3 = xf * Vector3(cluster_side * lat, 0.40, 0.0)
 				var yaw: float = deg_to_rad(facing) + xf.basis.get_euler().y
-				var sc: float = rng.randf_range(0.92, 1.08)
+				var sc: float = rng.randf_range(0.92, 1.08) * mesh_scale
 				var basis := Basis(Vector3.UP, yaw).scaled(Vector3(sc, sc, sc))
 				mm.set_instance_transform(idx, Transform3D(basis, pos))
-				mm.set_instance_color(idx, palette[rng.randi() % palette.size()])
-				var activity: float = 0.35 if persona == 0 else 1.0
-				mm.set_instance_custom_data(idx, Color(rng.randf(), activity, float(persona) / 3.0, 0.0))
 				total += 1
 				idx += 1
 		# Hide any unused instances.
 		for k in range(idx, count):
 			mm.set_instance_transform(k, Transform3D(Basis().scaled(Vector3.ZERO), Vector3(0.0, -1000.0, 0.0)))
 
-	print("CityBuilder: populated the streets with %d crowdspeople" % total)
+	print("CityBuilder: populated the streets with %d realistic crowdspeople" % total)

@@ -75,6 +75,9 @@ var _security_drones: Array[Dictionary] = []
 
 # 5. Autonomous Traffic Fleet & Intersection Signal Network
 var _animated_chars: Array[Dictionary] = []
+
+static var _rpm_walk_anim: Animation = null
+static var _rpm_bone_by_name: Dictionary = {}
 var _traffic_vehicles: Array[Dictionary] = []
 var _traffic_signals: Array[Dictionary] = []
 var _horn_stream: AudioStreamWAV
@@ -363,6 +366,88 @@ static func _pick_anim(anims: Array, names: Array) -> String:
 			if String(a).to_lower() == String(want).to_lower():
 				return String(a)
 	return ""
+
+
+## Ready Player Me avatars share a standard 89-bone rig. This rebuilds nathan's walk cycle
+## onto any of them by matching bones by index (the names carry per-avatar prefixes).
+static func _rpm_walk_animation() -> Animation:
+	if _rpm_walk_anim != null:
+		return _rpm_walk_anim
+	var src: Node3D = (load("res://models/city_hd/nathan.glb") as PackedScene).instantiate()
+	var sk: Skeleton3D = null
+	for n in src.find_children("*", "Skeleton3D", true, false):
+		sk = n as Skeleton3D
+		break
+	var ap: AnimationPlayer = null
+	for n in src.find_children("*", "AnimationPlayer", true, false):
+		ap = n as AnimationPlayer
+		break
+	if sk == null or ap == null or not ap.has_animation("Take 001"):
+		if src: src.free()
+		return null
+	_rpm_walk_anim = ap.get_animation("Take 001")
+	_rpm_bone_by_name.clear()
+	for i in sk.get_bone_count():
+		_rpm_bone_by_name[sk.get_bone_name(i)] = i
+	src.free()
+	return _rpm_walk_anim
+
+
+static func _retarget_rpm_walk(dst_skel: Skeleton3D, dst_path: NodePath) -> Animation:
+	var base := _rpm_walk_animation()
+	if base == null or dst_skel == null:
+		return null
+	var a: Animation = base.duplicate(true)
+	for i in range(a.get_track_count()):
+		var s := str(a.track_get_path(i))
+		var idx := s.find(":")
+		if idx < 0:
+			continue
+		var bi: int = int(_rpm_bone_by_name.get(s.substr(idx + 1), -1))
+		if bi < 0 or bi >= dst_skel.get_bone_count():
+			continue
+		a.track_set_path(i, NodePath(str(dst_path) + ":" + dst_skel.get_bone_name(bi)))
+	return a
+
+
+## Spawns one of the realistic Ready Player Me people walking the sidewalk with a retargeted
+## walk cycle.
+func spawn_rpm_character(track_root: Node3D, scene: PackedScene, offset: float, lat: float, speed: float, dir: float, target_h: float, yaw_offset: float = 0.0) -> void:
+	if scene == null:
+		return
+	var raw := scene.instantiate() as Node3D
+	if raw == null:
+		return
+	var fitted := _fit_character_height(raw, target_h)
+	track_root.add_child(fitted)
+	var sk: Skeleton3D = null
+	for n in fitted.find_children("*", "Skeleton3D", true, false):
+		sk = n as Skeleton3D
+		break
+	var ap := AnimationPlayer.new()
+	raw.add_child(ap)
+	ap.root_node = NodePath("..")
+	if sk != null:
+		var walk := _retarget_rpm_walk(sk, raw.get_path_to(sk))
+		if walk != null:
+			var lib := AnimationLibrary.new()
+			lib.add_animation("Walk", walk)
+			ap.add_animation_library("", lib)
+			ap.play("Walk", -1, clampf(speed / 1.35, 0.65, 1.3))
+	_animated_chars.append({
+		"node": fitted,
+		"ap": ap,
+		"offset": offset,
+		"lat": lat,
+		"speed": speed,
+		"dir": dir,
+		"walk": "Walk",
+		"idle": "",
+		"wave": "",
+		"yaw_offset": yaw_offset,
+		"react_timer": 0.0,
+		"react_cd": randf() * 6.0,
+	})
 
 
 ## Spawns a fully skeletal-animated character that walks the sidewalk, idles, and waves at the

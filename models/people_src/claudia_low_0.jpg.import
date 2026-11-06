@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bquyfm3n5q6eh"
-path="res://.godot/imported/walker_cesium_0.jpg-0644180011f87cb241eac1fbc7ee0d03.ctex"
+uid="uid://bsejbci7g2e0y"
+path="res://.godot/imported/claudia_low_0.jpg-adbf9976d01167fd908417be78ed099e.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "6e5510bcef557244090b3e9110eac834"
+"md5": "3de541a8836f91db46a741dc17880ff7"
 }
 
 [deps]
 
-source_file="res://models/characters/walker_cesium_0.jpg"
-dest_files=["res://.godot/imported/walker_cesium_0.jpg-0644180011f87cb241eac1fbc7ee0d03.ctex"]
+source_file="res://models/people_src/claudia_low_0.jpg"
+dest_files=["res://.godot/imported/claudia_low_0.jpg-adbf9976d01167fd908417be78ed099e.ctex"]
 
 [params]
 
