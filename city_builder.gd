@@ -1275,7 +1275,7 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 			var bd: float = rng.randf_range(28.0, 38.0)
 			var near_grid := false
 			for gline in range(-900, 901, 260):
-				if absf(bx - float(gline)) < bw * 0.5 + 19.0 or absf(bz - float(gline)) < bd * 0.5 + 19.0:
+				if absf(bx - float(gline)) < bw * 0.5 + 14.5 or absf(bz - float(gline)) < bd * 0.5 + 14.5:
 					near_grid = true
 					break
 			if near_grid:
@@ -2557,20 +2557,18 @@ static func _build_grid_street_furniture(main: Node, track_root: Node3D, z_lines
 	sign_magenta.emission_enabled = true
 	sign_magenta.emission = Color(1.0, 0.16, 0.72)
 	sign_magenta.emission_energy_multiplier = 2.8
+	var cornice_mat := _make_pbr_concrete(Color(0.28, 0.28, 0.27), 0.72, 0.10)
+	var store_mats: Array[StandardMaterial3D] = []
+	for i in TEX_STOREFRONTS.size():
+		var sm := StandardMaterial3D.new()
+		sm.albedo_texture = TEX_STOREFRONTS[i]
+		sm.roughness = 0.45
+		sm.emission_enabled = true
+		sm.emission_texture = TEX_STOREFRONTS[i]
+		sm.emission_energy_multiplier = 0.45
+		store_mats.append(sm)
 
-	# Extract reusable modules from Poly Haven's modular apartment and factory facade kits.
-	var wall_mesh: Mesh = null
-	var door_mesh: Mesh = null
-	var crown_mesh: Mesh = null
-	var kit: Node = PH_APT_FACADE.instantiate()
-	if kit:
-		var wsrc := kit.find_child("wall_window_centered_large_03", true, false) as MeshInstance3D
-		var dsrc := kit.find_child("door_centered_large_01", true, false) as MeshInstance3D
-		var csrc := kit.find_child("crown_standard_standard_01", true, false) as MeshInstance3D
-		if wsrc: wall_mesh = wsrc.mesh
-		if dsrc: door_mesh = dsrc.mesh
-		if csrc: crown_mesh = csrc.mesh
-		kit.free()
+	# Extract reusable modules from Poly Haven's modular factory facade kit.
 	var wall_fac: Mesh = null
 	var door_fac: Mesh = null
 	var crown_fac: Mesh = null
@@ -2583,20 +2581,18 @@ static func _build_grid_street_furniture(main: Node, track_root: Node3D, z_lines
 		if df: door_fac = df.mesh
 		if cf: crown_fac = cf.mesh
 		kitf.free()
-	var wall_cool := _tinted_mesh(wall_mesh, Color(0.72, 0.78, 0.86))
-	var wall_warm := _tinted_mesh(wall_mesh, Color(1.0, 0.86, 0.72))
 
 	var walks: Array[Transform3D] = []
 	var curbs: Array[Transform3D] = []
 	var bodies: Array[Transform3D] = []
-	var fw0: Array[Transform3D] = []
-	var fw1: Array[Transform3D] = []
-	var fw2: Array[Transform3D] = []
 	var fwfac: Array[Transform3D] = []
-	var fd_apt: Array[Transform3D] = []
 	var fd_fac: Array[Transform3D] = []
-	var fc_apt: Array[Transform3D] = []
 	var fc_fac: Array[Transform3D] = []
+	var b0: Array[Transform3D] = []
+	var b1: Array[Transform3D] = []
+	var b2: Array[Transform3D] = []
+	var b3: Array[Transform3D] = []
+	var cornices: Array[Transform3D] = []
 	var sa: Array[Transform3D] = []
 	var sb: Array[Transform3D] = []
 	var poles: Array[Transform3D] = []
@@ -2629,37 +2625,30 @@ static func _build_grid_street_furniture(main: Node, track_root: Node3D, z_lines
 						curbs.append(Transform3D(Basis().scaled(Vector3(seg - 0.4, 0.34, 0.22)), Vector3(mx, 0.17, z + side * 7.11)))
 						var h: float = 9.0 if counter % 3 == 0 else 6.0
 						bodies.append(Transform3D(Basis().scaled(Vector3(seg - 0.5, h, 4.0)), Vector3(mx, h * 0.5, pc)))
-						var style := counter % 7
-						var is_fac := style >= 5
-						var tail: Array[Transform3D]
-						if is_fac:
-							tail = fwfac
-						elif style % 3 == 0:
-							tail = fw0
-						elif style % 3 == 1:
-							tail = fw1
-						else:
-							tail = fw2
+						var use_fac := counter % 3 == 0
 						var yaw: float = 0.0 if side < 0.0 else PI
 						var fb := Basis(Vector3.UP, yaw)
 						var fz: float = z + side * 10.0
 						var foff := fb * Vector3(1.5, 0.0, 0.0)
-						for off in [-3.0, 3.0]:
-							tail.append(Transform3D(fb, Vector3(mx + off, 0.0, fz) + foff))
-						if is_fac:
+						if use_fac:
+							for off in [-3.0, 3.0]:
+								fwfac.append(Transform3D(fb, Vector3(mx + off, 0.0, fz) + foff))
 							fd_fac.append(Transform3D(fb, Vector3(mx, 0.0, fz) + foff))
-						else:
-							fd_apt.append(Transform3D(fb, Vector3(mx, 0.0, fz) + foff))
-						var floors: Array[float] = [3.0]
-						if h > 6.5:
-							floors.append(6.0)
-						for fy in floors:
-							for off2 in [-3.0, 0.0, 3.0]:
-								tail.append(Transform3D(fb, Vector3(mx + off2, fy, fz) + foff))
-						if is_fac:
+							var floors: Array[float] = [3.0]
+							if h > 6.5:
+								floors.append(6.0)
+							for fy in floors:
+								for off2 in [-3.0, 0.0, 3.0]:
+									fwfac.append(Transform3D(fb, Vector3(mx + off2, fy, fz) + foff))
 							fc_fac.append(Transform3D(fb, Vector3(mx, h, fz) + foff))
 						else:
-							fc_apt.append(Transform3D(fb, Vector3(mx, h, fz) + foff))
+							var band := Transform3D(Basis().scaled(Vector3(seg - 1.0, 3.4, 0.2)), Vector3(mx, 1.9, z + side * 10.0))
+							match counter % 4:
+								0: b0.append(band)
+								1: b1.append(band)
+								2: b2.append(band)
+								_: b3.append(band)
+							cornices.append(Transform3D(Basis().scaled(Vector3(seg - 0.5, 0.35, 4.4)), Vector3(mx, h + 0.17, pc)))
 						if counter % 3 == 0:
 							var st := Transform3D(Basis().scaled(Vector3(3.6, 1.0, 0.16)), Vector3(mx, 4.45, z + side * 10.35))
 							if (counter / 3) % 2 == 0:
@@ -2691,37 +2680,30 @@ static func _build_grid_street_furniture(main: Node, track_root: Node3D, z_lines
 						curbs.append(Transform3D(Basis().scaled(Vector3(0.22, 0.34, seg - 0.4)), Vector3(x + side * 7.11, 0.17, mz)))
 						var h2: float = 9.0 if counter % 3 == 0 else 6.0
 						bodies.append(Transform3D(Basis().scaled(Vector3(4.0, h2, seg - 0.5)), Vector3(pcx, h2 * 0.5, mz)))
-						var style2 := counter % 7
-						var is_fac2 := style2 >= 5
-						var tail2: Array[Transform3D]
-						if is_fac2:
-							tail2 = fwfac
-						elif style2 % 3 == 0:
-							tail2 = fw0
-						elif style2 % 3 == 1:
-							tail2 = fw1
-						else:
-							tail2 = fw2
+						var use_fac2 := counter % 3 == 0
 						var yaw2: float = PI * 0.5 if side < 0.0 else -PI * 0.5
 						var fb2 := Basis(Vector3.UP, yaw2)
 						var fx: float = x + side * 10.0
 						var foff2 := fb2 * Vector3(1.5, 0.0, 0.0)
-						for off in [-3.0, 3.0]:
-							tail2.append(Transform3D(fb2, Vector3(fx, 0.0, mz + off) + foff2))
-						if is_fac2:
+						if use_fac2:
+							for off in [-3.0, 3.0]:
+								fwfac.append(Transform3D(fb2, Vector3(fx, 0.0, mz + off) + foff2))
 							fd_fac.append(Transform3D(fb2, Vector3(fx, 0.0, mz) + foff2))
-						else:
-							fd_apt.append(Transform3D(fb2, Vector3(fx, 0.0, mz) + foff2))
-						var floors2: Array[float] = [3.0]
-						if h2 > 6.5:
-							floors2.append(6.0)
-						for fy in floors2:
-							for off2 in [-3.0, 0.0, 3.0]:
-								tail2.append(Transform3D(fb2, Vector3(fx, fy, mz + off2) + foff2))
-						if is_fac2:
+							var floors2: Array[float] = [3.0]
+							if h2 > 6.5:
+								floors2.append(6.0)
+							for fy in floors2:
+								for off2 in [-3.0, 0.0, 3.0]:
+									fwfac.append(Transform3D(fb2, Vector3(fx, fy, mz + off2) + foff2))
 							fc_fac.append(Transform3D(fb2, Vector3(fx, h2, mz) + foff2))
 						else:
-							fc_apt.append(Transform3D(fb2, Vector3(fx, h2, mz) + foff2))
+							var band2 := Transform3D(Basis().scaled(Vector3(0.2, 3.4, seg - 1.0)), Vector3(x + side * 10.0, 1.9, mz))
+							match counter % 4:
+								0: b0.append(band2)
+								1: b1.append(band2)
+								2: b2.append(band2)
+								_: b3.append(band2)
+							cornices.append(Transform3D(Basis().scaled(Vector3(4.4, 0.35, seg - 0.5)), Vector3(pcx, h2 + 0.17, mz)))
 						if counter % 3 == 0:
 							var st2 := Transform3D(Basis().scaled(Vector3(0.16, 1.0, 3.6)), Vector3(x + side * 10.35, 4.45, mz))
 							if (counter / 3) % 2 == 0:
@@ -2776,14 +2758,14 @@ static func _build_grid_street_furniture(main: Node, track_root: Node3D, z_lines
 	_add_multimesh_boxes(track_root, walks, pad_mat, "GridSidewalks")
 	_add_multimesh_boxes(track_root, curbs, curb_mat, "GridCurbs")
 	_add_multimesh_boxes(track_root, bodies, podium_mat, "GridPodiums")
-	_add_multimesh_mesh(track_root, wall_mesh, fw0, "GridFacadeWalls0")
-	_add_multimesh_mesh(track_root, wall_cool, fw1, "GridFacadeWalls1")
-	_add_multimesh_mesh(track_root, wall_warm, fw2, "GridFacadeWalls2")
 	_add_multimesh_mesh(track_root, wall_fac, fwfac, "GridFacadeWallsFactory")
-	_add_multimesh_mesh(track_root, door_mesh, fd_apt, "GridFacadeDoors")
 	_add_multimesh_mesh(track_root, door_fac, fd_fac, "GridFacadeDoorsFactory")
-	_add_multimesh_mesh(track_root, crown_mesh, fc_apt, "GridFacadeCrowns")
 	_add_multimesh_mesh(track_root, crown_fac, fc_fac, "GridFacadeCrownsFactory")
+	_add_multimesh_boxes(track_root, b0, store_mats[0], "GridShops0")
+	_add_multimesh_boxes(track_root, b1, store_mats[1], "GridShops1")
+	_add_multimesh_boxes(track_root, b2, store_mats[2], "GridShops2")
+	_add_multimesh_boxes(track_root, b3, store_mats[3], "GridShops3")
+	_add_multimesh_boxes(track_root, cornices, cornice_mat, "GridCornices")
 	_add_multimesh_boxes(track_root, sa, sign_cyan, "GridSignsCyan")
 	_add_multimesh_boxes(track_root, sb, sign_magenta, "GridSignsMagenta")
 	_add_multimesh_boxes(track_root, poles, pole_mat, "GridLampPoles")
