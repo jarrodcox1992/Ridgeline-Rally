@@ -1332,6 +1332,9 @@ func _process(delta: float) -> void:
 		# tourists dawdle, couriers are already weaving.
 		var v_pos: Vector3 = node.global_position
 		var player_dist: float = v_pos.distance_to(player_pos)
+		var want_vis := player_dist < 320.0
+		if node.visible != want_vis:
+			node.visible = want_vis
 		var persona: int = int(veh.get("persona", TrafficPersona.POLITE))
 		if player_dist < 34.0 and target_spd > 0.0:
 			match persona:
@@ -1391,6 +1394,9 @@ func _process(delta: float) -> void:
 		var side := Vector3.BACK if axis == 0 else Vector3.RIGHT
 		var pos: Vector3 = forward * gt + side * (float(veh.street_coord) + float(veh.lane))
 		pos.y = 0.20
+		var want_gvis := pos.distance_squared_to(player_pos) < 102400.0
+		if gnode.visible != want_gvis:
+			gnode.visible = want_gvis
 		var gb := Basis.looking_at(-forward * float(veh.dir), Vector3.UP) # model front is +Z
 		gnode.global_transform = Transform3D(gb, pos)
 
@@ -1553,6 +1559,12 @@ func _process(delta: float) -> void:
 
 		var state: int = int(ac.get("state", 0))
 		var dist_sq: float = node.global_position.distance_squared_to(player_pos)
+		# Distance LOD: only animate and draw the walkers close enough to read.
+		var near_vis := dist_sq < 16900.0
+		if node.visible != near_vis:
+			node.visible = near_vis
+			if is_instance_valid(ap):
+				ap.active = near_vis
 		var notice_sq := 225.0
 		match persona:
 			Persona.TIMID: notice_sq = 400.0

@@ -356,7 +356,7 @@ var _track_root: Node3D
 var minimap_ctrl: Control
 var _track_bounds_min := Vector2(-400.0, -400.0)
 var _track_bounds_max := Vector2(400.0, 400.0)
-var current_quality_level := 2
+var current_quality_level := 1
 
 # Dynamic Cockpit & Camera G-Force Inertia Rig
 var _head_inertia_pos := Vector3.ZERO
@@ -548,6 +548,10 @@ func _physics_process(delta: float) -> void:
 		_honk()
 	if Input.is_action_just_pressed("show_fps"):
 		fps_label.visible = not fps_label.visible
+	if Input.is_action_just_pressed("quality"):
+		current_quality_level = (current_quality_level + 1) % 3
+		apply_quality(current_quality_level)
+		_show_message("Graphics: " + ["Performance", "Balanced", "Quality"][current_quality_level], 1.2)
 	if Input.is_action_just_pressed("camera"):
 		camera_view = (camera_view + 1) % CAMERA_VIEWS.size()
 		_show_message(CAMERA_VIEWS[camera_view].name, 1.2)
@@ -710,8 +714,8 @@ func apply_quality(level: int) -> void:
 	current_quality_level = level
 	var viewport := get_viewport()
 	viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
-	viewport.scaling_3d_scale = [0.75, 1.0, 1.0][level]
-	env.ssao_enabled = level >= 1
+	viewport.scaling_3d_scale = [0.66, 0.75, 1.0][level]
+	env.ssao_enabled = level >= 2
 	env.ssao_radius = 1.4
 	env.ssao_intensity = 2.0
 	env.ssao_light_affect = 0.20
@@ -721,15 +725,18 @@ func apply_quality(level: int) -> void:
 	env.ssr_fade_out = 2.0
 	env.ssil_enabled = false
 	env.glow_enabled = level >= 1
-	_shadow_distance = [120.0, 200.0, 260.0][level]
+	_shadow_distance = [120.0, 160.0, 260.0][level]
 	sun.directional_shadow_max_distance = _shadow_distance * _shadow_scale
-	sun.directional_shadow_blend_splits = level >= 1
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if level == 0 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	sun.directional_shadow_blend_splits = level >= 2
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL if level <= 1 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 	for grass in grass_instances:
 		grass.visible = level >= 1
 		grass.visibility_range_end = 60.0 if level == 1 else 90.0
 	_tree_shadows = level >= 1
 	_update_tree_shadows()
+	if is_instance_valid(_track_root):
+		for n in _track_root.find_children("GridFacade*", "MultiMeshInstance3D", true, false):
+			n.visible = level >= 1
 
 
 # --- Input ---------------------------------------------------------------
@@ -746,6 +753,7 @@ func _setup_input() -> void:
 	_add_action("horn", [KEY_G], [JOY_BUTTON_B], [])
 	_add_action("look_back", [KEY_B], [JOY_BUTTON_LEFT_SHOULDER], [])
 	_add_action("show_fps", [KEY_F], [], [])
+	_add_action("quality", [KEY_G], [], [])
 	_add_action("repair_road", [KEY_K], [JOY_BUTTON_X], [])
 	_add_action("photo_mode", [KEY_V], [JOY_BUTTON_RIGHT_SHOULDER], [])
 	_add_action("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START], [])
@@ -2265,7 +2273,7 @@ func _build_hud() -> void:
 	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	var help := _make_label(layer, 15)
-	help.text = "W/S: drive    A/D: steer    Space: handbrake / drift    Space+W: burnout    K: repair road    R: reset    C: camera    B: look back    H: headlights    V: photo mode    F: fps    Esc: menu"
+	help.text = "W/S: drive    A/D: steer    Space: handbrake / drift    Space+W: burnout    K: repair road    R: reset    C: camera    B: look back    H: headlights    V: photo mode    F: fps    G: graphics    Esc: menu"
 	help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	help.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	help.offset_left = 28.0

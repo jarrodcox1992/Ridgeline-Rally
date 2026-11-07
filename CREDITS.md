@@ -49,9 +49,13 @@ All from [Poly Haven](https://polyhaven.com/textures), CC0 (public domain):
 
 "Rock Moss Set 01" and "Boulder 01" from [Poly Haven](https://polyhaven.com/models), CC0 (public domain).
 
-## Street props
+## Street props & building kits
 
-"Wooden Barrels 01" from [Poly Haven](https://polyhaven.com/a/wooden_barrels_01), CC0 (public domain). Used as alley clutter.
+The following are from [Poly Haven](https://polyhaven.com/models), CC0 (public domain):
+- "Wooden Barrels 01" — alley clutter.
+- "Modular Factory Facade" and "Modular Urban Apartments Facade" — grid-street building facades.
+- "Standing Chalkboard 01" and "Fire Hydrant" — grid intersection props.
+- "Street Lamp 02", "Modular Street Seating", "Modular Chainlink Fence", "Modular Fire Escape", "Covered Car" and "Rollershutter Door" — downloaded street-furniture set (available for future dressing).
 
 ## Audio & Sound Effects
 

@@ -255,6 +255,11 @@ static func _spawn_model(track_root: Node3D, scene: PackedScene, xform: Transfor
 		if scene == MODEL_TREE_LARGE:
 			_tint_tree_lush_green(inst)
 		track_root.add_child(inst)
+		# Small street props don't need to pay for shadow-map draws.
+		for mi in inst.find_children("*", "MeshInstance3D", true, false):
+			var mb: AABB = mi.global_transform * mi.get_aabb()
+			if mb.size.length() < 6.0:
+				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		return inst
 	return null
 
@@ -1309,6 +1314,7 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 			var inst := MeshInstance3D.new()
 			inst.mesh = mesh
 			inst.position = Vector3(bx, base_h * 0.5, bz)
+			inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			track_root.add_child(inst)
 			
 			# Vertical Exoskeleton Corner Columns on background towers
@@ -1319,6 +1325,7 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 				var f_inst := MeshInstance3D.new()
 				f_inst.mesh = fin
 				f_inst.position = Vector3(bx + cx_s * bw, base_h * 0.5, bz)
+				f_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 				track_root.add_child(f_inst)
 			
 			if bh > 75.0:
@@ -1332,6 +1339,7 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 				var t_inst := MeshInstance3D.new()
 				t_inst.mesh = top_mesh
 				t_inst.position = Vector3(bx, base_h + top_h * 0.5, bz)
+				t_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 				track_root.add_child(t_inst)
 				
 				var collar := BoxMesh.new()
@@ -1340,6 +1348,7 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 				var c_inst := MeshInstance3D.new()
 				c_inst.mesh = collar
 				c_inst.position = Vector3(bx, base_h, bz)
+				c_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 				track_root.add_child(c_inst)
 				
 				var crown := BoxMesh.new()
@@ -1348,6 +1357,7 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 				var cr_inst := MeshInstance3D.new()
 				cr_inst.mesh = crown
 				cr_inst.position = Vector3(bx, bh, bz)
+				cr_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 				track_root.add_child(cr_inst)
 				
 				var spire_cyl := CylinderMesh.new()
@@ -1358,6 +1368,7 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 				var sp_inst := MeshInstance3D.new()
 				sp_inst.mesh = spire_cyl
 				sp_inst.position = Vector3(bx, bh + 9.0, bz)
+				sp_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 				track_root.add_child(sp_inst)
 			
 			var body := StaticBody3D.new()
@@ -2625,7 +2636,7 @@ static func _build_grid_street_furniture(main: Node, track_root: Node3D, z_lines
 						curbs.append(Transform3D(Basis().scaled(Vector3(seg - 0.4, 0.34, 0.22)), Vector3(mx, 0.17, z + side * 7.11)))
 						var h: float = 9.0 if counter % 3 == 0 else 6.0
 						bodies.append(Transform3D(Basis().scaled(Vector3(seg - 0.5, h, 4.0)), Vector3(mx, h * 0.5, pc)))
-						var use_fac := counter % 3 == 0
+						var use_fac := counter % 3 == 0 and Vector2(mx, z).length() < 520.0
 						var yaw: float = 0.0 if side < 0.0 else PI
 						var fb := Basis(Vector3.UP, yaw)
 						var fz: float = z + side * 10.0
@@ -2680,7 +2691,7 @@ static func _build_grid_street_furniture(main: Node, track_root: Node3D, z_lines
 						curbs.append(Transform3D(Basis().scaled(Vector3(0.22, 0.34, seg - 0.4)), Vector3(x + side * 7.11, 0.17, mz)))
 						var h2: float = 9.0 if counter % 3 == 0 else 6.0
 						bodies.append(Transform3D(Basis().scaled(Vector3(4.0, h2, seg - 0.5)), Vector3(pcx, h2 * 0.5, mz)))
-						var use_fac2 := counter % 3 == 0
+						var use_fac2 := counter % 3 == 0 and Vector2(x, mz).length() < 520.0
 						var yaw2: float = PI * 0.5 if side < 0.0 else -PI * 0.5
 						var fb2 := Basis(Vector3.UP, yaw2)
 						var fx: float = x + side * 10.0
