@@ -496,6 +496,7 @@ func _load_osm_track(path: String, cfg: Dictionary) -> Array[Vector3]:
 
 
 func _ready() -> void:
+	get_viewport().use_occlusion_culling = true
 	_setup_input()
 	noise.seed = 7
 	noise.frequency = 0.004

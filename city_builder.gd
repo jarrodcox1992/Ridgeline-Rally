@@ -278,6 +278,16 @@ static func _tinted_mesh(mesh: Mesh, tint: Color) -> Mesh:
 	return out
 
 
+## Adds an invisible box occluder so the renderer can cull geometry hidden behind buildings.
+static func _add_box_occluder(track_root: Node3D, size: Vector3, xf: Transform3D) -> void:
+	var occ := OccluderInstance3D.new()
+	var bo := BoxOccluder3D.new()
+	bo.size = size * 0.98
+	occ.occluder = bo
+	occ.transform = xf
+	track_root.add_child(occ)
+
+
 ## Batches many copies of a kit mesh into one draw call (used for the modular facade).
 static func _add_multimesh_mesh(track_root: Node3D, mesh: Mesh, xforms: Array[Transform3D], node_name: String) -> void:
 	if xforms.is_empty() or mesh == null:
@@ -948,6 +958,7 @@ static func _build_frontage_highrise(track_root: Node3D, xform: Transform3D, o: 
 	pod_body.add_child(pod_col)
 	pod_body.transform = pod_inst.transform
 	track_root.add_child(pod_body)
+	_add_box_occluder(track_root, Vector3(d, podium_h, w), pod_inst.transform)
 	
 	# Projecting 2nd-Story Elevated Pedestrian Terrace Slab & Parapet Railing (y = 5.2m)
 	_add_second_story_balcony_deck(track_root, xform, o, front_lat, w, side, exo_concrete, living_ctrl)
@@ -1048,6 +1059,7 @@ static func _build_frontage_highrise(track_root: Node3D, xform: Transform3D, o: 
 	tow_body.add_child(tow_col)
 	tow_body.transform = tow_inst.transform
 	track_root.add_child(tow_body)
+	_add_box_occluder(track_root, Vector3(tow_d, tower_h, tow_w), tow_inst.transform)
 	
 	# Sculptural Brutalist Exoskeleton Vertical & Tapered A-Frame Megacolumns (matching the central tower in reference image!)
 	var tow_front_lat: float = lat - side * (tow_d * 0.5)
@@ -1154,6 +1166,7 @@ static func _build_frontage_residential(track_root: Node3D, xform: Transform3D, 
 	body.add_child(col)
 	body.transform = inst.transform
 	track_root.add_child(body)
+	_add_box_occluder(track_root, Vector3(d, height, w), inst.transform)
 	
 	# Street-Facing 2nd-Story Pedestrian Balcony Deck + 3D Balconies & Projecting 3D Neon Street Signs
 	var front_lat: float = lat - side * (d * 0.5)
@@ -1199,6 +1212,7 @@ static func _build_frontage_brick(track_root: Node3D, xform: Transform3D, o: flo
 	body.add_child(col)
 	body.transform = inst.transform
 	track_root.add_child(body)
+	_add_box_occluder(track_root, Vector3(d, height, w), inst.transform)
 	
 	# Rooftop 3D Water Tower on Stilts
 	_spawn_model(track_root, MODEL_WATER_TANK, xform, Vector3(lat, height + 2.28, 0.0), 5.5)
@@ -1237,6 +1251,7 @@ static func _build_frontage_industrial(track_root: Node3D, xform: Transform3D, o
 	body.add_child(col)
 	body.transform = inst.transform
 	track_root.add_child(body)
+	_add_box_occluder(track_root, Vector3(d, height, w), inst.transform)
 	
 	var front_lat: float = lat - side * (d * 0.5)
 	_add_second_story_balcony_deck(track_root, xform, o, front_lat, w, side, iron_mat, living_ctrl)
@@ -1261,6 +1276,14 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 	var roof_caps: Array[Transform3D] = []
 	var roof_units: Array[Transform3D] = []
 	var roof_masts: Array[Transform3D] = []
+	var tower_x: Array = []
+	for mi in glass_materials.size():
+		var tarr: Array[Transform3D] = []
+		tower_x.append(tarr)
+	var fin_x: Array[Transform3D] = []
+	var collar_x: Array[Transform3D] = []
+	var crown_x: Array[Transform3D] = []
+	var spire_x: Array[Transform3D] = []
 	var h_pos_1: Vector3 = (main.call("_track_transform", 185.0, 0.0) as Transform3D) * Vector3(-50.0, 0.0, 0.0)
 	var h_pos_2: Vector3 = (main.call("_track_transform", 2300.0, 0.0) as Transform3D) * Vector3(-50.0, 0.0, 0.0)
 	
@@ -1305,71 +1328,24 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 				
 			placed_aabbs.append(candidate_aabb)
 			
-			var chosen_mat: ShaderMaterial = glass_materials[rng.randi() % glass_materials.size()]
-			var bg_exo := bg_exo_shared
+			var mat_idx: int = rng.randi() % glass_materials.size()
 			var base_h: float = bh * 0.72 if bh > 75.0 else bh
-			var mesh := BoxMesh.new()
-			mesh.size = Vector3(bw, base_h, bd)
-			mesh.material = chosen_mat
-			var inst := MeshInstance3D.new()
-			inst.mesh = mesh
-			inst.position = Vector3(bx, base_h * 0.5, bz)
-			inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			track_root.add_child(inst)
+			var ta: Array[Transform3D] = tower_x[mat_idx]
+			ta.append(Transform3D(Basis().scaled(Vector3(bw, base_h, bd)), Vector3(bx, base_h * 0.5, bz)))
 			
 			# Vertical Exoskeleton Corner Columns on background towers
 			for cx_s in [-0.48, 0.48]:
-				var fin := BoxMesh.new()
-				fin.size = Vector3(1.8, base_h, bd + 0.8)
-				fin.material = bg_exo
-				var f_inst := MeshInstance3D.new()
-				f_inst.mesh = fin
-				f_inst.position = Vector3(bx + cx_s * bw, base_h * 0.5, bz)
-				f_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				track_root.add_child(f_inst)
+				fin_x.append(Transform3D(Basis().scaled(Vector3(1.8, base_h, bd + 0.8)), Vector3(bx + cx_s * bw, base_h * 0.5, bz)))
 			
 			if bh > 75.0:
 				# Stepped Upper Setback Tier + Brutalist Crown Collar + Twin Spires
 				var top_h: float = bh - base_h
 				var top_w: float = bw * 0.68
 				var top_d: float = bd * 0.68
-				var top_mesh := BoxMesh.new()
-				top_mesh.size = Vector3(top_w, top_h, top_d)
-				top_mesh.material = chosen_mat
-				var t_inst := MeshInstance3D.new()
-				t_inst.mesh = top_mesh
-				t_inst.position = Vector3(bx, base_h + top_h * 0.5, bz)
-				t_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				track_root.add_child(t_inst)
-				
-				var collar := BoxMesh.new()
-				collar.size = Vector3(bw + 1.6, 1.8, bd + 1.6)
-				collar.material = bg_exo
-				var c_inst := MeshInstance3D.new()
-				c_inst.mesh = collar
-				c_inst.position = Vector3(bx, base_h, bz)
-				c_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				track_root.add_child(c_inst)
-				
-				var crown := BoxMesh.new()
-				crown.size = Vector3(top_w + 1.2, 2.2, top_d + 1.2)
-				crown.material = bg_exo
-				var cr_inst := MeshInstance3D.new()
-				cr_inst.mesh = crown
-				cr_inst.position = Vector3(bx, bh, bz)
-				cr_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				track_root.add_child(cr_inst)
-				
-				var spire_cyl := CylinderMesh.new()
-				spire_cyl.top_radius = 0.12
-				spire_cyl.bottom_radius = 0.45
-				spire_cyl.height = 18.0
-				spire_cyl.material = bg_exo
-				var sp_inst := MeshInstance3D.new()
-				sp_inst.mesh = spire_cyl
-				sp_inst.position = Vector3(bx, bh + 9.0, bz)
-				sp_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				track_root.add_child(sp_inst)
+				ta.append(Transform3D(Basis().scaled(Vector3(top_w, top_h, top_d)), Vector3(bx, base_h + top_h * 0.5, bz)))
+				collar_x.append(Transform3D(Basis().scaled(Vector3(bw + 1.6, 1.8, bd + 1.6)), Vector3(bx, base_h, bz)))
+				crown_x.append(Transform3D(Basis().scaled(Vector3(top_w + 1.2, 2.2, top_d + 1.2)), Vector3(bx, bh, bz)))
+				spire_x.append(Transform3D(Basis(), Vector3(bx, bh + 9.0, bz)))
 			
 			var body := StaticBody3D.new()
 			body.name = "BG_Building_%d" % bg_count
@@ -1380,6 +1356,7 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 			body.add_child(col)
 			body.position = Vector3(bx, bh * 0.5, bz)
 			track_root.add_child(body)
+			_add_box_occluder(track_root, Vector3(bw, bh, bd), Transform3D(Basis(), Vector3(bx, bh * 0.5, bz)))
 			
 			# Finished roofscape: parapet cap + plant units + masts, so no tower is a bare box.
 			if bh <= 75.0:
@@ -1395,6 +1372,32 @@ static func _build_secondary_skyline_grid(main: Node, track_root: Node3D, rng: R
 				_spawn_model(track_root, MODEL_ANTENNA_DISH, Transform3D(Basis.IDENTITY, Vector3(bx, bh + 1.15, bz)), Vector3.ZERO, 3.2, 45.0)
 				
 			bg_count += 1
+	for mi in glass_materials.size():
+		var arr: Array[Transform3D] = tower_x[mi]
+		if arr.is_empty():
+			continue
+		var tm := BoxMesh.new()
+		tm.size = Vector3.ONE
+		tm.material = glass_materials[mi]
+		_add_multimesh_mesh(track_root, tm, arr, "BG_Towers_%d" % mi)
+	var fm := BoxMesh.new()
+	fm.size = Vector3.ONE
+	fm.material = bg_exo_shared
+	_add_multimesh_mesh(track_root, fm, fin_x, "BG_Fins")
+	var com := BoxMesh.new()
+	com.size = Vector3.ONE
+	com.material = bg_exo_shared
+	_add_multimesh_mesh(track_root, com, collar_x, "BG_Collars")
+	var crm := BoxMesh.new()
+	crm.size = Vector3.ONE
+	crm.material = bg_exo_shared
+	_add_multimesh_mesh(track_root, crm, crown_x, "BG_Crowns")
+	var sm := CylinderMesh.new()
+	sm.top_radius = 0.12
+	sm.bottom_radius = 0.45
+	sm.height = 18.0
+	sm.material = bg_exo_shared
+	_add_multimesh_mesh(track_root, sm, spire_x, "BG_Spires")
 	_add_multimesh_boxes(track_root, roof_caps, bg_exo_shared, "BG_RoofCaps")
 	_add_multimesh_boxes(track_root, roof_units, _make_pbr_metal(Color(0.42, 0.44, 0.47), 0.35, 0.8), "BG_RoofPlant")
 	_add_multimesh_boxes(track_root, roof_masts, _make_pbr_metal(Color(0.25, 0.27, 0.30), 0.3, 0.9), "BG_RoofMasts")
@@ -2860,7 +2863,7 @@ static func _build_animated_characters(main: Node, track_root: Node3D, living_ct
 		return
 	var track_len: float = float(main.get("track_length"))
 	var road_half: float = float(main.get("ROAD_HALF_WIDTH"))
-	var walker_scale := 1.0
+	var walker_scale := 0.8
 	if OS.get_environment("WALKER_SCALE") != "":
 		walker_scale = maxf(0.0, float(OS.get_environment("WALKER_SCALE")))
 	var count := int(160.0 * walker_scale)
@@ -2986,7 +2989,7 @@ static func _build_dense_crowd(main: Node, track_root: Node3D, rng: RandomNumber
 		]
 
 	# CROWD_SCALE env var scales the population (handy for profiling; 1.0 is the full city).
-	var crowd_scale := 1.0
+	var crowd_scale := 0.7
 	if OS.get_environment("CROWD_SCALE") != "":
 		crowd_scale = maxf(0.0, float(OS.get_environment("CROWD_SCALE")))
 
